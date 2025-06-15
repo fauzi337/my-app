@@ -1,0 +1,6 @@
+"id"	"namaprioritas"	"created_at"	"updated_at"	"statusenabled"
+"1"	"Low"	"14/5/2025 01:44:41"		"t"
+"2"	"Medium"	"14/5/2025 01:44:41"		"t"
+"3"	"High"	"14/5/2025 01:44:41"		"t"
+"4"	"Very High"	"14/5/2025 01:44:41"		"t"
+"5"	"-"	"14/5/2025 01:44:41"		"t"

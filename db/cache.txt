@@ -1,0 +1,3 @@
+"key"	"value"	"expiration"
+"laravel_cache_jons@gmail.com|127.0.0.1:timer"	"i:1747149506;"	"1747149506"
+"laravel_cache_jons@gmail.com|127.0.0.1"	"i:1;"	"1747149506"

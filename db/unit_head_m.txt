@@ -1,0 +1,7 @@
+"id"	"namadepartemen"	"created_at"	"updated_at"	"statusenabled"
+"1"	"Instalasi Rawat Jalan"	"18/5/2025 19:46:46"		"t"
+"2"	"Instalasi Gawat Darurat"	"18/5/2025 19:46:46"		"t"
+"3"	"Instalasi Rawat Inap"	"18/5/2025 19:46:46"		"t"
+"4"	"Instalasi Bedah Sentral"	"18/5/2025 19:46:46"		"t"
+"5"	"Instalasi Farmasi"	"18/5/2025 19:46:46"		"t"
+"6"	"Direksi"	"18/5/2025 19:46:46"		"t"

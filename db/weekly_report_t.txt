@@ -1,0 +1,5 @@
+"id"	"weeklyreport"	"created_at"	"updated_at"	"statusenabled"	"status"	"kd_list"	"week"	"month"
+"1"	"req 2 Dengan Status = Progress di Server - Not Yet pada tgl Belum Selesai"	"28/5/2025 02:13:17"		"t"	"Progress            "	"ABS-1-jadwal        "	"Mg5                                               "	"Mei                                               "
+"2"	"bridging 1 Dengan Status = Done dan Status Akhir - Request Production pada tgl 2025-05-25"	"28/5/2025 02:13:17"		"t"	"RequestProduction   "	"RSF-1-jadwal        "	"Mg5                                               "	"Mei                                               "
+"3"	"req 3 Dengan Status Server = Live Production pada tgl 2025-05-28"	"28/5/2025 02:13:17"		"t"	"RequestDocument     "	"RSPPN-1-jadwal      "	"Mg5                                               "	"Mei                                               "
+"4"	"agenda 1 Dengan Status = Done di unit - Ruang Direktur dengan PIC Dr. I Wayan Darta pada tgl 2025-05-24"	"28/5/2025 02:13:17"		"t"			"Mg5                                               "	"Mei                                               "
