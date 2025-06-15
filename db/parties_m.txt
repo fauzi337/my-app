@@ -1,0 +1,7 @@
+"id"	"parties"	"created_at"	"updated_at"	"statusenabled"
+"1"	"Management External"	"18/5/2025 19:46:46"		"t"
+"2"	"Management Internal"	"18/5/2025 19:46:46"		"t"
+"3"	"External"	"18/5/2025 19:46:46"		"t"
+"4"	"Onsite"	"18/5/2025 19:46:46"		"t"
+"5"	"Vendor"	"18/5/2025 19:46:46"		"t"
+"6"	"Internal"	"18/5/2025 22:02:05"		"f"

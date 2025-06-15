@@ -1,0 +1,8 @@
+"id"	"namavendor"	"groupvendor"	"created_at"	"updated_at"	"statusenabled"
+"1"	"JASAMEDIKA"		"14/5/2025 01:44:41"		"t"
+"2"	"PT KIS"		"14/5/2025 01:44:41"		"t"
+"3"	"TRANSINDO"		"14/5/2025 01:44:41"		"t"
+"4"	"PT NATIF"		"14/5/2025 01:44:41"		"t"
+"5"	"SUBAGA"		"14/5/2025 01:44:41"		"t"
+"6"	"Elevan"		"14/5/2025 01:44:41"		"t"
+"7"	"Pusat"		"14/5/2025 01:53:44"		"t"
