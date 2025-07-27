@@ -11,11 +11,54 @@
                 </div>
 
                 <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                {{-- <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                </div> --}}
+                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                    <x-nav-link>
+                       <div x-data="{
+                                open: false,
+                                search: '',
+                                menuItems: [
+                                    { label: 'Dashboard', href: '{{ route('dashboard') }}' },
+                                    { label: 'Timeline', href: '{{ route('dashboard.jadwal') }}' },
+                                    { label: 'Agenda', href: '{{ route('dashboard.agenda') }}' }
+                                ]
+                            }"
+                            class="flex justify-center items-center h-16 relative">
+
+                            <!-- ✅ Tambahkan tombol menu DI SINI -->
+                            <span @click="open = !open; $nextTick(() => $refs.searchBox.focus())"
+                                class="cursor-pointer text-gray-700 hover:text-blue-500 text-sm px-4 py-2">
+                                Menu
+                            </span>
+
+                            <!-- ✅ Dropdown menu -->
+                            <div x-show="open" @click.outside="open = false"
+                                class="absolute top-12 bg-white shadow-md rounded-md py-2 w-64 z-50 max-h-64 overflow-y-auto">
+
+                                <!-- Search box -->
+                                <div class="px-4 pb-2">
+                                    <input x-model="search" x-ref="searchBox" type="text"
+                                        placeholder="Cari menu..."
+                                        class="w-full px-2 py-1 border rounded text-sm"
+                                    >
+                                </div>
+
+                                <!-- Filtered Menu -->
+                                <template x-for="item in menuItems.filter(i => i.label.toLowerCase().includes(search.toLowerCase()))" :key="item.label">
+                                    <a :href="item.href"
+                                    class="block px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer text-sm"
+                                    x-text="item.label">
+                                    </a>
+                                </template>
+                            </div>
+                        </div>
+                    </x-nav-link>
                 </div>
+                
             </div>
 
             <!-- Settings Dropdown -->
@@ -98,3 +141,48 @@
         </div>
     </div>
 </nav>
+
+<!-- resources/views/layouts/navigation.blade.php -->
+
+{{-- <nav class="bg-white border-b border-gray-100">
+    <div x-data="{
+            open: false,
+            search: '',
+            menuItems: [
+                { label: 'Dashboard', href: '{{ route('dashboard') }}' },
+                { label: 'Timeline', href: '{{ route('dashboard.jadwal') }}' },
+                { label: 'Agenda', href: '{{ route('dashboard.agenda') }}' }
+            ]
+        }"
+        class="flex justify-center items-center h-16 relative"
+    >
+
+        <!-- ✅ Tambahkan tombol menu DI SINI -->
+        <span @click="open = !open; $nextTick(() => $refs.searchBox.focus())"
+              class="cursor-pointer text-gray-700 hover:text-blue-500 text-sm px-4 py-2">
+            Menu
+        </span>
+
+        <!-- ✅ Dropdown menu -->
+        <div x-show="open" @click.outside="open = false"
+             class="absolute top-12 bg-white shadow-md rounded-md py-2 w-64 z-50 max-h-64 overflow-y-auto"
+        >
+
+            <!-- Search box -->
+            <div class="px-4 pb-2">
+                <input x-model="search" x-ref="searchBox" type="text"
+                       placeholder="Cari menu..."
+                       class="w-full px-2 py-1 border rounded text-sm"
+                >
+            </div>
+
+            <!-- Filtered Menu -->
+            <template x-for="item in menuItems.filter(i => i.label.toLowerCase().includes(search.toLowerCase()))" :key="item.label">
+                <a :href="item.href"
+                   class="block px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer text-sm"
+                   x-text="item.label">
+                </a>
+            </template>
+        </div>
+    </div>
+</nav> --}}
