@@ -175,7 +175,7 @@ class AntrianController extends Controller
             'final_status_id' => $request->finalst,
             'statusenabled' => true,
             // 'kd_list' => $kdSite . '-' . $newid+1 ,
-            'kd_list' => $kdSite,
+            'kd_list' => trim($kdSite),
             'nourut' => $count,
             // 'kd_revisi' => $request->finalst = 20 ? $rev : null
             'created_at' => $today,
@@ -187,7 +187,7 @@ class AntrianController extends Controller
             'statusenabled' => true,
             'aktifitas' => $validated['task'],
             'status' => 'Not Yet',
-            'kd_list' => $kdSite . '-' . $count,
+            'kd_list' => trim($kdSite) . '-' . $count,
             'created_at' => $today,
             'jadwal_id' => $newid +1,
         ]);
