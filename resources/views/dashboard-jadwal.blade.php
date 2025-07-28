@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xxl text-gray-800 leading-tight">
+        <h2 class="font-semibold text-orange-600/75 text-xl text-gray-800 leading-tight" style="font-size: 50px">
             {{ __('Timeline Request') }}
         </h2>
     </x-slot>
@@ -177,12 +177,12 @@
                         </svg>
                         Simpan
                     </button>
-                    <a href="{{ route('antrian.index') }}" class="flex items-center gap-1 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm no-underline font-semibold rounded-lg shadow-sm transition-all duration-200 ease-in-out transform hover:scale-105">
+                    {{-- <a href="{{ route('antrian.index') }}" class="flex items-center gap-1 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm no-underline font-semibold rounded-lg shadow-sm transition-all duration-200 ease-in-out transform hover:scale-105">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
                         </svg>
                         Halaman Utama
-                    </a>
+                    </a> --}}
                     <a href="{{ route('dashboard.dev') }}" class="flex items-center gap-1 px-3 py-1.5 bg-blue-400 hover:bg-blue-600 text-white text-sm no-underline font-semibold rounded-lg shadow-sm transition-all duration-200 ease-in-out transform hover:scale-105">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
