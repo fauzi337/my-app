@@ -9,6 +9,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Route::middleware('auth')->group(function () {
 Route::get('/', [AntrianController::class, 'index'])->name('antrian.index');
 Route::get('/antrian/jumlah', [AntrianController::class, 'jumlah'])->name('antrian.jumlah');
 Route::get('/delete-antrian/{id}', [AntrianController::class, 'destroy']);
@@ -31,6 +32,7 @@ Route::post('/save-dashboard-agenda', [AntrianController::class, 'postAgenda'])-
 Route::post('/update-statusagenda/{id}', [AntrianController::class, 'updateAgenda'])->name('update.agenda');
 Route::post('/save-dailyreport', [AntrianController::class, 'saveDaily'])->name('save.daily');
 Route::post('/save-weeklyreport', [AntrianController::class, 'saveWeekly'])->name('save.weekly');
+// });
 
 Route::get('/dashboard', function () {
     return view('dashboard');

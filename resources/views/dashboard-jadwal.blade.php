@@ -113,7 +113,8 @@
                     <div>
                         <label class="block text-sm font-medium">PIC Request</label>
                         <select name="picrequest" class="w-full border-gray-300 rounded-lg p-2 focus:ring-red-500 focus:border-red-500">
-                            @foreach ($picReq as $itemPicReq)
+                            @foreach ($cekLogin as $itemPicReq)
+                            {{-- @foreach ($picReq as $itemPicReq) --}}
                                 {{-- <option value="{{ $pagawe->kdjenispegawai }}"> - {{ $pagawe->namapegawai }}</option> --}}
                                 <option value="{{ $itemPicReq->id }}">{{ $itemPicReq->namalengkap }}</option>
                             @endforeach
