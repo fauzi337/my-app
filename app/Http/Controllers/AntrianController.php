@@ -20,6 +20,7 @@ use App\Models\DailyReport;
 use App\Models\Activity;
 use App\Models\WeeklyReport;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 
 
@@ -115,9 +116,16 @@ class AntrianController extends Controller
                             ->get(); 
         $statusFinal = Status::where('statusenabled', true)
                             ->where('jenisstatus','=','Final')
-                            ->get(); 
+                            ->get();
+        $user = Auth::user()->pegawai_id;
 
-        return view('dashboard-jadwal', compact('daftarJadwal','pegawai','prioritas','jenisTask','site','timeline','picReq','statusDev','statusServer','statusPicReq','statusFinal'));
+        $cekLogin = Pegawai::from('pegawai_m as pg')
+                            ->join('users as us','us.pegawai_id','=','pg.id')
+                            ->where('pg.id',$user)
+                            ->select('pg.id','pg.namalengkap')
+                            ->get();
+
+        return view('dashboard-jadwal', compact('daftarJadwal','pegawai','prioritas','jenisTask','site','timeline','picReq','statusDev','statusServer','statusPicReq','statusFinal','cekLogin'));
       
     }
 

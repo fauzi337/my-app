@@ -23,6 +23,9 @@ class AuthenticatedSessionController extends Controller
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
+            // $user = Auth::user();
+            // dd($user);
+            // echo $user->profile->name;
             return redirect()->intended('/dashboardjadwal/jadwal'); // atau route tujuanmu
         }
 
