@@ -148,8 +148,8 @@
             </thead>
             <tbody class="divide-y divide-gray-200">
                 @foreach ($listReqServ as $item)
-                    <tr @if($item->servstatus == 'Merge Req Production') style="background-color: #ffbbda;"
-                        @elseif($item->namaprioritas == 'Merge Req Development') style="background-color: #ffbbda;" @endif>
+                    <tr @if($item->servstid == 9) style="background-color: #ffbbda;"
+                        @elseif($item->servstid == 7) style="background-color: #ffbbda;" @endif>
                         <td class="px-4 py-2">{{ $item->kd_list }}</td>
                         <td class="px-4 py-2">{{ $item->jenistask }}</td>
                         <td class="px-4 py-2">{{ $item->namasite }}</td>
