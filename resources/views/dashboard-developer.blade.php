@@ -140,6 +140,9 @@
     <h2 class="text-xl font-semibold">List Developer</h2>
     <div class="flex gap-3 text-sm">
 
+        <span class="px-3 py-1 rounded-full font-semibold text-white bg-[#ff006b] shadow-sm">
+        Bug
+        </span>
         <span class="px-3 py-1 rounded-full font-semibold text-pink-800 bg-[#ffbbda] shadow-sm">
         Very High
         </span>
@@ -172,9 +175,10 @@
             </thead>
             <tbody class="divide-y divide-gray-200">
                 @foreach ($listDev as $item)
-                    <tr @if($item->namaprioritas == 'Very High') style="background-color: #ffbbda;" 
+                    <tr @if($item->picreqstid == 14) style="background-color: #ff006b;color:white"
                         @elseif($item->namaprioritas == 'High') style="background-color: #f8d7da;"
                         @elseif($item->namaprioritas == 'Medium') style="background-color: #fff3cd;"
+                        @elseif($item->namaprioritas == 'Very High') style="background-color: #ffbbda;"
                         @endif>
                         <td class="px-4 py-2">{{ $item->kd_list }}</td>
                         <td class="px-4 py-2">{{ $item->jenistask }}</td>

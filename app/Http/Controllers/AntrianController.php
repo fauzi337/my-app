@@ -83,6 +83,7 @@ class AntrianController extends Controller
                             ->join('timeline_m as tm','tm.id','=','jt.timeline_id')
                             ->join('site_m as si','si.id','=','jt.site_id')
                             ->where('jt.developer_status_id',1)
+                            ->where('jt.statusenabled',true)
                             ->select('jt.kd_list','pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline',
                             DB::raw("CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"))
                             ->orderBy('jt.created_at')
@@ -217,6 +218,7 @@ class AntrianController extends Controller
                             ->join('status_m as st2','st2.id','=','jt.server_status_id')
                             ->join('status_m as st3','st3.id','=','jt.picrequest_status_id')
                             ->whereNotIn('st.id',[3,5])
+                            ->orWhere('st3.id',14)
                             ->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','st.id as devstid','jt.id',
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"),
                                     'st.status as devstatus','st2.status as servstatus','st2.id as servstid','st3.id as picreqstid')
@@ -268,6 +270,7 @@ class AntrianController extends Controller
                             ->join('status_m as st4','st4.id','=','jt.final_status_id')
                             ->whereIn('st.id',[3,5])
                             ->whereNotIn('st4.id',[21])
+                            ->where('jt.statusenabled',true)
                             ->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','jt.id',
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"),
                                     'st.status as devstatus','st2.status as servstatus','st3.status as picreqst','st3.id as picreqstid','st4.id as finalstid','st4.status as finalst','jt.path',
@@ -343,6 +346,9 @@ class AntrianController extends Controller
 
         $updatePicReqSt = Jadwal::find($id);
         $updatePicReqSt->picrequest_status_id = $request->picreqstid;
+        if ($request->picreqstid == 14) {
+            $updatePicReqSt->developer_status_id = 2;
+        }
         $updatePicReqSt->final_status_id = $request->finalstid;
         $updatePicReqSt->updated_at = $today;
         $updatePicReqSt->save();
