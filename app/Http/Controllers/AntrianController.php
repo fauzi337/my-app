@@ -222,7 +222,8 @@ class AntrianController extends Controller
                             ->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','st.id as devstid','jt.id',
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"),
                                     'st.status as devstatus','st2.status as servstatus','st2.id as servstid','st3.id as picreqstid')
-                            ->orderBy('jt.prioritas_id','desc')
+                            ->orderBy('jt.prioritas_id', 'desc')
+                            ->orderBy('jt.created_at', 'desc')
                             ->get();
 
         $statusDev = Status::where('statusenabled', true)
@@ -276,6 +277,7 @@ class AntrianController extends Controller
                                     'st.status as devstatus','st2.status as servstatus','st3.status as picreqst','st3.id as picreqstid','st4.id as finalstid','st4.status as finalst','jt.path',
                                     'st.id as devstid')
                             ->orderBy('jt.prioritas_id','desc')
+                            ->orderBy('jt.created_at','desc')
                             ->get();
                             // dd($listPicReq);
 
@@ -396,6 +398,7 @@ class AntrianController extends Controller
                             ->join('status_m as st4','st4.id','=','jt.final_status_id')
                             ->join('status_m as st2','st2.id','=','jt.server_status_id')
                             ->whereIn('st4.id',[21])
+                            ->where('jt.statusenabled',true)
                             ->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','st4.id as finalstid','st4.status as finalst','jt.id',
                                     'st2.id as servstid','st2.status as servstatus',
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"))

@@ -144,7 +144,7 @@
         <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
             <thead class="bg-gray-100 text-gray-700">
                 <tr>
-                    <th class="px-4 py-2 text-left">KD-List</th>
+                    <th class="px-5 py-2 text-left">KD-List</th>
                     <th class="px-4 py-2 text-left">Jenis Task</th>
                     <th class="px-4 py-2 text-left">Task</th>
                     <th class="px-4 py-2 text-left">Timeline</th>
