@@ -206,7 +206,7 @@
                             </button>
                         </td>
                         <td>
-                        <a href="{{ asset($item->path) }}" target="_blank" title="Lihat" class="@if($item->finalstid != 19) disabled pointer-events-none opacity-50 @endif">
+                        <a href="{{ asset(str_replace('public/storage/pdf/', 'pdf/', $item->path)) }}" target="_blank" title="Lihat" class="@if($item->finalstid != 19) disabled pointer-events-none opacity-50 @endif">
                                 <i class="bi bi-eye-fill btn btn-outline-info"></i>
                             </a>
                         </td>
