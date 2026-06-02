@@ -2,4 +2,229 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom transitions and scrollbars */
+* {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+}
 
+/* Page Header Beautification */
+header h2 {
+    font-size: 1.875rem !important;
+    font-weight: 800 !important;
+    background: linear-gradient(to right, #ea580c, #ca8a04) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    letter-spacing: -0.03em !important;
+    text-align: center !important;
+    margin: 0.25rem auto !important;
+    display: block !important;
+    width: fit-content;
+}
+.dark header h2 {
+    background: linear-gradient(to right, #f97316, #eab308) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+/* Custom styles for dark mode overrides */
+.dark body {
+    background-color: #111827 !important;
+    color: #f3f4f6 !important;
+}
+
+.dark .bg-white {
+    background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-50 {
+    background-color: #374151 !important;
+}
+
+.dark .bg-gray-100 {
+    background-color: #111827 !important;
+}
+
+.dark .text-gray-900 {
+    color: #f9fafb !important;
+}
+
+.dark .text-gray-800 {
+    color: #f3f4f6 !important;
+}
+
+.dark .text-gray-700 {
+    color: #e5e7eb !important;
+}
+
+.dark .text-gray-600 {
+    color: #d1d5db !important;
+}
+
+.dark .text-gray-500 {
+    color: #9ca3af !important;
+}
+
+.dark .border-gray-100 {
+    border-color: #374151 !important;
+}
+
+.dark .border-gray-200 {
+    border-color: #374151 !important;
+}
+
+.dark .border-gray-300 {
+    border-color: #4b5563 !important;
+}
+
+.dark input, 
+.dark select, 
+.dark textarea {
+    background-color: #374151 !important;
+    border-color: #4b5563 !important;
+    color: #ffffff !important;
+}
+
+.dark input::placeholder, 
+.dark textarea::placeholder {
+    color: #9ca3af !important;
+}
+
+.dark table {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+}
+
+.dark thead {
+    background-color: #374151 !important;
+    color: #f3f4f6 !important;
+}
+
+.dark tr {
+    border-color: #374151 !important;
+    background-color: transparent !important;
+}
+
+.dark td {
+    color: #f3f4f6 !important;
+    border-color: #374151 !important;
+}
+
+/* Dark mode for Bootstrap modals and components */
+.dark .modal-content {
+    background-color: #1f2937 !important;
+    color: #f3f4f6 !important;
+    border-color: #374151 !important;
+}
+
+.dark .modal-header,
+.dark .modal-footer {
+    border-color: #374151 !important;
+}
+
+.dark .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.dark .btn-outline-primary {
+    color: #a3e635 !important;
+    border-color: #a3e635 !important;
+}
+
+.dark .btn-outline-primary:hover {
+    background-color: #a3e635 !important;
+    color: #111827 !important;
+}
+
+/* Custom contrast status highlights for Agenda in dark mode */
+.dark tr[style*="background-color: #ffe0bb"] {
+    background-color: #7c2d12 !important; /* dark orange/amber */
+    color: #ffedd5 !important;
+}
+
+.dark tr[style*="background-color: #bbdaff"] {
+    background-color: #1e3a8a !important; /* dark blue */
+    color: #dbeafe !important;
+}
+
+/* Custom contrast status highlights for Daily Report in dark mode */
+.dark tr[style*="background-color: #ff8080"] {
+    background-color: #7f1d1d !important; /* dark red */
+    color: #fee2e2 !important;
+}
+
+/* Custom contrast status highlights for Developer in dark mode */
+.dark tr[style*="background-color: #ff006b"] {
+    background-color: #881337 !important; /* dark rose */
+    color: #ffe4e6 !important;
+}
+.dark tr[style*="background-color: #f8d7da"] {
+    background-color: #7f1d1d !important; /* dark red */
+    color: #fee2e2 !important;
+}
+.dark tr[style*="background-color: #fff3cd"] {
+    background-color: #78350f !important; /* dark yellow/brown */
+    color: #fef3c7 !important;
+}
+.dark tr[style*="background-color: #ffbbda"] {
+    background-color: #831843 !important; /* dark pink */
+    color: #fce7f3 !important;
+}
+
+/* Custom contrast status highlights for PIC Request in dark mode */
+.dark tr[style*="background-color: #e0bbff"] {
+    background-color: #581c87 !important; /* dark purple */
+    color: #f3e8ff !important;
+}
+.dark tr[style*="background-color: #fcffbb"] {
+    background-color: #3f6212 !important; /* dark yellow-green */
+    color: #f7fee7 !important;
+}
+.dark tr[style*="background-color: #ffb59a"] {
+    background-color: #7c2d12 !important; /* dark copper */
+    color: #ffedd5 !important;
+}
+
+/* Custom contrast status highlights for Request Server in dark mode */
+.dark tr[style*="background-color: #ffbbda"] {
+    background-color: #831843 !important; /* dark pink */
+    color: #fce7f3 !important;
+}
+
+/* Toast Dark Mode adjustment */
+.dark .bg-green-100 {
+    background-color: #064e3b !important;
+    border-color: #047857 !important;
+    color: #d1fae5 !important;
+}
+.dark .bg-red-100 {
+    background-color: #7f1d1d !important;
+    border-color: #b91c1c !important;
+    color: #fee2e2 !important;
+}
+
+/* Form headers and titles in Dark Mode */
+.dark h2, .dark h1, .dark h3 {
+    color: #f3f4f6 !important;
+}
+
+/* Custom label and inline text colors */
+.dark label {
+    color: #d1d5db !important;
+}
+
+/* Buttons in dark mode */
+.dark button[type="submit"].bg-green-500 {
+    background-color: #16a34a !important;
+}
+.dark button[type="submit"].bg-green-500:hover {
+    background-color: #15803d !important;
+}
+
+.dark a.bg-blue-400 {
+    background-color: #2563eb !important;
+}
+.dark a.bg-blue-400:hover {
+    background-color: #1d4ed8 !important;
+}

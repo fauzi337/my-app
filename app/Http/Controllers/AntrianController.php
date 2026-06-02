@@ -241,8 +241,11 @@ class AntrianController extends Controller
         $jumlahReqServer = Jadwal::from('jadwal_t as jt')
                             ->join('status_m as st4','st4.id','=','jt.final_status_id')
                             ->join('status_m as st2','st2.id','=','jt.server_status_id')
-                            ->where('st4.id',21)
-                            ->orWhere('st2.id',7)
+                            ->where('jt.statusenabled', true)
+                            ->where(function($query) {
+                                $query->where('st4.id', 21)
+                                      ->orWhere('st2.id', 7);
+                            })
                             ->count(); 
 
         // return response()->json([
@@ -397,8 +400,11 @@ class AntrianController extends Controller
                             ->join('pegawai_m as pg2','pg2.id','=','jt.picdeveloper_id')
                             ->join('status_m as st4','st4.id','=','jt.final_status_id')
                             ->join('status_m as st2','st2.id','=','jt.server_status_id')
-                            ->whereIn('st4.id',[21])
-                            ->where('jt.statusenabled',true)
+                            ->where('jt.statusenabled', true)
+                            ->where(function($query) {
+                                $query->where('st4.id', 21)
+                                      ->orWhere('st2.id', 7);
+                            })
                             ->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','st4.id as finalstid','st4.status as finalst','jt.id',
                                     'st2.id as servstid','st2.status as servstatus',
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"))
@@ -477,7 +483,7 @@ class AntrianController extends Controller
             }
 
             $uploadFile->uat = $filename;
-            $uploadFile->path = 'public/storage/pdf/' . $filename;
+            $uploadFile->path = 'pdf/' . $filename;
             $uploadFile->final_status_id = 19;
             $uploadFile->updated_at = $today;
             $uploadFile->save();
