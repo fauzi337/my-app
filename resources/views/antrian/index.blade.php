@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Antrian Sembako</title>
+    <title>Monitoring Project</title>
     @vite('resources/css/app.css') <!-- Ini untuk load Tailwind -->
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
