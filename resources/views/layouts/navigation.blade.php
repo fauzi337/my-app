@@ -17,7 +17,9 @@
                         search: '',
                         menuItems: [
                             { label: 'Timeline Request', href: '{{ route('dashboard.jadwal') }}' },
-                            { label: 'Agenda Pihak Luar', href: '{{ route('dashboard.agenda') }}' },
+                            { label: 'Agenda', href: '{{ route('dashboard.agenda') }}' },
+                            { label: 'Project Tracker', href: '{{ route('project.tracker') }}' },
+                            { label: 'Project Activity', href: '{{ route('project.activity') }}' },
                             { label: 'Developer', href: '{{ route('dashboard.dev') }}' },
                             { label: 'PIC Request', href: '{{ route('dashboard.picreq') }}' },
                             { label: 'Request Server', href: '{{ route('dashboard.reqserver') }}' },
@@ -143,6 +145,8 @@
                 mobileMenuItems: [
                     { label: 'Timeline Request', href: '{{ route('dashboard.jadwal') }}' },
                     { label: 'Agenda Pihak Luar', href: '{{ route('dashboard.agenda') }}' },
+                    { label: 'Project Tracker', href: '{{ route('project.tracker') }}' },
+                    { label: 'Project Activity', href: '{{ route('project.activity') }}' },
                     { label: 'Developer', href: '{{ route('dashboard.dev') }}' },
                     { label: 'PIC Request', href: '{{ route('dashboard.picreq') }}' },
                     { label: 'Request Server', href: '{{ route('dashboard.reqserver') }}' },

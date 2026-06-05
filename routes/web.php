@@ -31,6 +31,23 @@ Route::middleware('auth')->group(function () {
     Route::post('/update-statusagenda/{id}', [AntrianController::class, 'updateAgenda'])->name('update.agenda');
     Route::post('/save-dailyreport', [AntrianController::class, 'saveDaily'])->name('save.daily');
     Route::post('/save-weeklyreport', [AntrianController::class, 'saveWeekly'])->name('save.weekly');
+
+    // Meeting Management & Project Tracker Routes
+    Route::post('/save-meeting-notes/{meeting_result_id}', [AntrianController::class, 'saveMeetingNotes'])->name('meeting.notes.save');
+    Route::get('/meeting-detail/{meeting_result_id}', [AntrianController::class, 'getMeetingDetail'])->name('meeting.detail');
+    Route::get('/agenda-timeline/{id}', [AntrianController::class, 'getAgendaTimeline'])->name('agenda.timeline');
+    Route::get('/project-tracker', [AntrianController::class, 'getProjectTracker'])->name('project.tracker');
+    Route::post('/save-project', [AntrianController::class, 'saveProject'])->name('project.save');
+    Route::post('/update-action-item/{action_item_id}', [AntrianController::class, 'updateActionItem'])->name('action.item.update');
+
+    // Project Activity Routes
+    Route::get('/project-activity', [AntrianController::class, 'getProjectActivity'])->name('project.activity');
+    Route::post('/save-project-activity', [AntrianController::class, 'saveProjectActivity'])->name('project.activity.save');
+    Route::post('/update-project-activity/{id}', [AntrianController::class, 'updateProjectActivity'])->name('project.activity.update');
+    Route::get('/delete-project-activity/{id}', [AntrianController::class, 'deleteProjectActivity'])->name('project.activity.delete');
+
+    // Follow-up Meeting Route
+    Route::get('/create-followup-meeting/{parent_meeting_result_id}', [AntrianController::class, 'createFollowupMeeting'])->name('meeting.followup');
 });
 
 Route::get('/dashboard', function () {

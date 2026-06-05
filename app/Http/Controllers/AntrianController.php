@@ -19,6 +19,18 @@ use App\Models\Unit;
 use App\Models\DailyReport;
 use App\Models\Activity;
 use App\Models\WeeklyReport;
+use App\Models\MasterActionCategory;
+use App\Models\MasterActionStatus;
+use App\Models\MasterPriority;
+use App\Models\Project;
+use App\Models\AgendaMeeting;
+use App\Models\MeetingResult;
+use App\Models\MeetingNotes;
+use App\Models\ActionItem;
+use App\Models\ActionItemProgress;
+use App\Models\AuditLog;
+use App\Models\User;
+use App\Models\ProjectActivity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
@@ -522,178 +534,717 @@ class AntrianController extends Controller
     }
 
      public function getDataAgenda()
-    {
-        $listAgenda = Agenda::from('agenda_t as ag')
-                            ->join('site_m as si','si.id','=','ag.site_id')
-                            ->join('pegawai_m as pg','pg.id','=','ag.picintern_id')
-                            ->join('pegawai_m as pg2','pg2.id','=','ag.picextern_id')
-                            ->join('status_m as st','st.id','=','ag.status_id')
-                            ->join('parties_m as pt','pt.id','=','ag.parties_id')
-                            ->join('jam_m as jm','jm.id','=','ag.jam_id')
-                            ->join('unit_m as un','un.id','=','ag.unit_id')
-                            // ->whereIn('st4.id',[21])
-                            ->select('ag.id','si.namasite','ag.tgl_jadwal','ag.tgl_realisasi','ag.kegiatan','pg.namapegawai as picintern','pg2.namapegawai as picextern','st.status','pt.parties',
-                            'jm.jam','un.unit','st.id as stid',
-                            // )
-                            DB::raw("CONCAT(ag.kd_list, '-', ag.nourut) as kd_list"))
-                            ->orderBy('ag.id','desc')
-                            ->get();
-                            
-        $statusAgenda = Status::where('statusenabled', true)
-                            ->where('jenisstatus','=','Agenda')
-                            ->where('id','<>',23)
-                            ->orderBy('id','desc')
-                            ->get(); 
+     {
+         $listAgenda = AgendaMeeting::from('agenda_meeting as ag')
+                             ->join('site_m as si','si.id','=','ag.site_id')
+                             ->join('pegawai_m as pg','pg.id','=','ag.picintern_id')
+                             ->join('pegawai_m as pg2','pg2.id','=','ag.picextern_id')
+                             ->join('status_m as st','st.id','=','ag.status_id')
+                             ->join('parties_m as pt','pt.id','=','ag.parties_id')
+                             ->join('jam_m as jm','jm.id','=','ag.jam_id')
+                             ->join('unit_m as un','un.id','=','ag.unit_id')
+                             ->where('ag.statusenabled', true)
+                             ->select('ag.id','si.namasite','ag.tgl_jadwal','ag.kegiatan','pg.namapegawai as picintern','pg2.namapegawai as picextern','st.status','pt.parties',
+                             'jm.jam','un.unit','st.id as stid',
+                             DB::raw("CONCAT(ag.kd_list, '-', ag.nourut) as kd_list"))
+                             ->orderBy('ag.id','desc')
+                             ->get();
 
-        $site = Site::where('statusenabled', true)
-                            ->get(); 
+          $listMeetingResults = MeetingResult::from('meeting_result as mr')
+                              ->join('agenda_meeting as ag', 'ag.id', '=', 'mr.agenda_meeting_id')
+                              ->join('site_m as si', 'si.id', '=', 'ag.site_id')
+                              ->join('parties_m as pt', 'pt.id', '=', 'ag.parties_id')
+                              ->leftJoin('project as pr', 'pr.id', '=', 'mr.project_id')
+                              ->where('mr.statusenabled', true)
+                              ->select('mr.id', 'mr.meeting_code', 'mr.agenda_meeting_id', 'si.namasite', 'ag.tgl_jadwal', 'ag.kegiatan', 'pt.parties', 'mr.status', 'mr.notes', 'pr.project_name', 'mr.project_id', 'ag.unit_id')
+                              ->orderBy('mr.id', 'desc')
+                              ->get();
 
-        $jam = Jam::where('statusenabled', true)
-                            ->get(); 
-                            
-        $parties = Parties::where('statusenabled', true)
-                            ->get();      
+          // Determine the latest meeting result and its status for each agenda
+          $latestMeetingResults = MeetingResult::where('statusenabled', true)
+              ->select('agenda_meeting_id', DB::raw('MAX(id) as max_id'))
+              ->groupBy('agenda_meeting_id')
+              ->pluck('max_id', 'agenda_meeting_id')
+              ->toArray();
 
-        $unit = Unit::where('statusenabled', true)
-                            ->get(); 
+          $latestStatuses = MeetingResult::whereIn('id', array_values($latestMeetingResults))
+              ->pluck('status', 'id')
+              ->toArray();
 
-        $picInternal = Pegawai::where('statusenabled', true)
-                            ->where('parties_id',6)
-                            ->whereIn('jenispegawai',['Operator','Implementator'])
-                            ->get(); 
+          foreach ($listMeetingResults as $mr) {
+              $maxId = $latestMeetingResults[$mr->agenda_meeting_id] ?? null;
+              $isLatest = ($mr->id === $maxId);
+              $latestStatus = trim($latestStatuses[$maxId] ?? '');
 
-        $picExternal = Pegawai::where('statusenabled', true)
-                            ->where('parties_id',3)
-                            ->get(); 
+              // Show plus button only if this is the latest meeting result for this agenda,
+              // and its status is 'On Going'
+              $mr->show_plus_button = ($isLatest && $latestStatus === 'On Going');
+          }
+                             
+         $statusAgenda = Status::where('statusenabled', true)
+                             ->where('jenisstatus','=','Agenda')
+                             ->where('id','<>',23)
+                             ->orderBy('id','desc')
+                             ->get(); 
 
-        return view('dashboard-agenda', compact('listAgenda','site','jam','parties','unit','picInternal','picExternal','statusAgenda'));
-    }
+         $site = Site::where('statusenabled', true)
+                             ->get(); 
 
-    public function postAgenda(Request $request)
-    {
-        $today = Carbon::now();
-        $saveAgenda = new Agenda();
-        $newid = Agenda::max('id');
+         $jam = Jam::where('statusenabled', true)
+                             ->get(); 
+                             
+         $parties = Parties::where('statusenabled', true)
+                             ->get();      
 
-        $validated = $request->validate([
-            'tgl_jadwal' => 'required|date',
-            'kegiatan' => 'required|string',
-            'site' => 'required|exists:site_m,id',
-            'jam' => 'required|exists:jam_m,id',
-            // 'status' => 'required|exists:status_m,id',
-            'parties' => 'required|exists:parties_m,id',
-            'unit' => 'required|exists:unit_m,id',
-            'pic_internal' => 'required|exists:pegawai_m,id',
-            'pic_external' => 'required|exists:pegawai_m,id',
-        ],[
-            'tgl_jadwal.required' => 'Penjadwalan Wajib di Isi !',
-            'kegiatan.required' => 'Kegiatan Wajib di Isi !',
-            'site.required' => 'Site Wajib di Isi !',
-            'jam.required' => 'Jam Wajib di Isi !',
-            // 'status.required' => 'Status Wajib di Isi !',
-            'parties.required' => 'Pihak Wajib di Isi !',
-            'unit.required' => 'Unit Wajib di Isi !',
-            'pic_internal.required' => 'PIC Internal Wajib di Isi !',
-            'pic_external.required' => 'PIC Eksternal Wajib di Isi !',
-        ]);
+         $unit = Unit::where('statusenabled', true)
+                             ->get(); 
 
-        $kdSite = Site::where('statusenabled', true)
-                        ->where('id', $request->site)
-                        ->value('kdsite');
+         $picInternal = Pegawai::where('statusenabled', true)
+                             ->where('parties_id',6)
+                             ->whereIn('jenispegawai',['Operator','Implementator'])
+                             ->get(); 
 
-        $count = Agenda::where('kd_list', $kdSite)->count() + 1;
+         $picExternal = Pegawai::where('statusenabled', true)
+                             ->where('parties_id',3)
+                             ->get(); 
 
-        $saveAgenda->id = $newid +1;
-        $saveAgenda->kegiatan = $validated['kegiatan'];
-        $saveAgenda->tgl_jadwal = $validated['tgl_jadwal'];
-        $saveAgenda->site_id = $validated['site'];
-        $saveAgenda->jam_id = $validated['jam'];
-        $saveAgenda->status_id = 23;
-        $saveAgenda->parties_id = $validated['parties'];
-        $saveAgenda->unit_id = $validated['unit'];
-        $saveAgenda->picintern_id = $validated['pic_internal'];
-        $saveAgenda->picextern_id = $validated['pic_external'];
-        $saveAgenda->statusenabled = true;
-        $saveAgenda->kd_list = $kdSite;
-        $saveAgenda->nourut = $count;
-        $saveAgenda->created_at = $today;
-        $saveAgenda->updated_at = null;
-        $saveAgenda->save();
+         // Master data for Action Items modal
+         $actionCategories = MasterActionCategory::where('statusenabled', true)->get();
+         $actionStatuses = MasterActionStatus::where('statusenabled', true)->get();
+         $priorities = MasterPriority::where('statusenabled', true)->get();
+         $units = Unit::where('statusenabled', true)->get();
+         $users = User::from('users as us')
+                      ->leftJoin('pegawai_m as pg', 'pg.id', '=', 'us.pegawai_id')
+                      ->select(
+                          'us.id',
+                          DB::raw("CASE WHEN pg.namapegawai IS NOT NULL THEN TRIM(pg.namapegawai) || COALESCE(' (' || TRIM(pg.jenispegawai) || ')', '') ELSE us.name END as name")
+                      )
+                      ->where('us.statusenabled', true)
+                      ->get();
+         $projects = Project::where('statusenabled', true)->get();
 
-        $getDataAgenda = Agenda::from('agenda_t as ag')
-                            ->join('status_m as st', 'st.id', '=', 'ag.status_id')
-                            ->join('unit_m as ut', 'ut.id', '=', 'ag.unit_id')
-                            ->join('pegawai_m as pg', 'pg.id', '=', 'ag.picextern_id')
-                            ->select('ag.kegiatan', 'st.status','ut.unit','pg.namapegawai','st.id as stid')
-                            ->where('ag.id', $saveAgenda->id)
-                            ->first(); // Ambil satu data saja
+         return view('dashboard-agenda', compact(
+             'listAgenda',
+             'listMeetingResults',
+             'site',
+             'jam',
+             'parties',
+             'unit',
+             'picInternal',
+             'picExternal',
+             'statusAgenda',
+             'actionCategories',
+             'actionStatuses',
+             'priorities',
+             'units',
+             'users',
+             'projects'
+         ));
+     }
 
-                        // Pastikan $getDataDev tidak null
-                        if ($getDataAgenda) {
-                            $newIds = Activity::max('id') ?? 0;
+     public function postAgenda(Request $request)
+     {
+         $today = Carbon::now();
+         $newid = AgendaMeeting::max('id') ?? 0;
 
-                            $statusText = $getDataAgenda->kegiatan . 
-                                        ' Dengan Status = ' . $getDataAgenda->status . 
-                                        ' di unit - ' . $getDataAgenda->unit . 
-                                        ' dengan PIC ' . $getDataAgenda->namapegawai . 
-                                        ' pada tgl ' . $validated['tgl_jadwal'];
+         $validated = $request->validate([
+             'tgl_jadwal' => 'required|date',
+             'kegiatan' => 'required|string',
+             'site' => 'required|exists:site_m,id',
+             'jam' => 'required|exists:jam_m,id',
+             'parties' => 'required|exists:parties_m,id',
+             'unit' => 'required|exists:unit_m,id',
+             'pic_internal' => 'required|exists:pegawai_m,id',
+             'pic_external' => 'required|exists:pegawai_m,id',
+         ],[
+             'tgl_jadwal.required' => 'Penjadwalan Wajib di Isi !',
+             'kegiatan.required' => 'Kegiatan Wajib di Isi !',
+             'site.required' => 'Site Wajib di Isi !',
+             'jam.required' => 'Jam Wajib di Isi !',
+             'parties.required' => 'Pihak Wajib di Isi !',
+             'unit.required' => 'Unit Wajib di Isi !',
+             'pic_internal.required' => 'PIC Internal Wajib di Isi !',
+             'pic_external.required' => 'PIC Eksternal Wajib di Isi !',
+         ]);
 
-                            Activity::insert([
-                                'id' => $newIds + 1,
-                                'statusenabled' => true,
-                                'aktifitas' => $statusText,
-                                'kd_list' => $kdSite . '-' . $count,
-                                'status' => $getDataAgenda->status,
-                                'created_at' => $today,
-                                'agenda_id' => $newid +1,
-                            ]);
-                        }
+         $kdSite = Site::where('statusenabled', true)
+                         ->where('id', $request->site)
+                         ->value('kdsite');
 
-        return redirect()->route('dashboard.agenda')->with('success', 'Simpan Berhasil !');
-    }
+         $count = AgendaMeeting::where('kd_list', $kdSite)->count() + 1;
+
+         $saveAgenda = new AgendaMeeting();
+         $saveAgenda->id = $newid + 1;
+         $saveAgenda->kegiatan = $validated['kegiatan'];
+         $saveAgenda->tgl_jadwal = $validated['tgl_jadwal'];
+         $saveAgenda->site_id = $validated['site'];
+         $saveAgenda->jam_id = $validated['jam'];
+         $saveAgenda->status_id = 23; // Scheduled status id
+         $saveAgenda->parties_id = $validated['parties'];
+         $saveAgenda->unit_id = $validated['unit'];
+         $saveAgenda->picintern_id = $validated['pic_internal'];
+         $saveAgenda->picextern_id = $validated['pic_external'];
+         $saveAgenda->statusenabled = true;
+         $saveAgenda->kd_list = $kdSite;
+         $saveAgenda->nourut = $count;
+         $saveAgenda->created_at = $today;
+         $saveAgenda->updated_at = null;
+         $saveAgenda->save();
+
+         // Automatically reset pgsql sequence just in case
+         if (DB::getDriverName() === 'pgsql') {
+             DB::statement("SELECT setval('agenda_meeting_id_seq', (SELECT MAX(id) FROM agenda_meeting))");
+         }
+
+         // Automatically create a record in the meeting_result table
+         $meetCode = 'MEET-' . trim($kdSite) . '-' . $count;
+         $meetResult = new MeetingResult();
+         $meetResult->meeting_code = $meetCode;
+         $meetResult->agenda_meeting_id = $saveAgenda->id;
+         $meetResult->status = 'Pending';
+         $meetResult->statusenabled = true;
+         $meetResult->save();
+
+         // Audit logging
+         AuditLog::create([
+             'user_id' => Auth::id(),
+             'activity' => 'Meeting dibuat',
+             'details' => 'Membuat agenda meeting: ' . $saveAgenda->kegiatan . ' (Kode: ' . $meetCode . ')'
+         ]);
+
+         // Trigger activity log for the legacy system
+         $getDataAgenda = AgendaMeeting::from('agenda_meeting as ag')
+                             ->join('status_m as st', 'st.id', '=', 'ag.status_id')
+                             ->join('unit_m as ut', 'ut.id', '=', 'ag.unit_id')
+                             ->join('pegawai_m as pg', 'pg.id', '=', 'ag.picextern_id')
+                             ->select('ag.kegiatan', 'st.status','ut.unit','pg.namapegawai','st.id as stid')
+                             ->where('ag.id', $saveAgenda->id)
+                             ->first();
+
+         if ($getDataAgenda) {
+             $newIds = Activity::max('id') ?? 0;
+             $statusText = $getDataAgenda->kegiatan . 
+                         ' Dengan Status = ' . $getDataAgenda->status . 
+                         ' di unit - ' . $getDataAgenda->unit . 
+                         ' dengan PIC ' . $getDataAgenda->namapegawai . 
+                         ' pada tgl ' . $validated['tgl_jadwal'];
+
+             Activity::insert([
+                 'id' => $newIds + 1,
+                 'statusenabled' => true,
+                 'aktifitas' => $statusText,
+                 'kd_list' => $kdSite . '-' . $count,
+                 'status' => $getDataAgenda->status,
+                 'created_at' => $today,
+                 'agenda_id' => $saveAgenda->id,
+             ]);
+         }
+
+         return redirect()->route('dashboard.agenda')->with('success', 'Simpan Berhasil !');
+     }
 
      public function updateAgenda(Request $request, $id)
+     {
+         $today = Carbon::now();
+         $id = intval($request->id);
+
+         $updateJadwal = AgendaMeeting::find($id);
+         $updateJadwal->status_id = $request->statusid;
+         $updateJadwal->tgl_realisasi = $request->tgl_selesai;
+         $updateJadwal->updated_at = $today;
+         $updateJadwal->save();
+
+         // Update meeting result if it exists
+         $meetResult = MeetingResult::where('agenda_meeting_id', $id)->first();
+         if ($meetResult) {
+             $statusMap = 'Pending';
+             $statusIdVal = intval($request->statusid);
+             if ($statusIdVal == 24) {
+                 $statusMap = 'Cancel';
+             } elseif ($statusIdVal == 25) {
+                 $statusMap = 'Done';
+             }
+             $meetResult->status = $statusMap;
+             $meetResult->tgl_realisasi = $request->tgl_selesai;
+             $meetResult->save();
+         }
+
+         // Audit logging
+         AuditLog::create([
+             'user_id' => Auth::id(),
+             'activity' => 'Meeting diubah',
+             'details' => 'Memperbarui status agenda meeting ID: ' . $id
+         ]);
+
+         $getDataAgenda = AgendaMeeting::from('agenda_meeting as ag')
+                             ->join('status_m as st', 'st.id', '=', 'ag.status_id')
+                             ->join('unit_m as ut', 'ut.id', '=', 'ag.unit_id')
+                             ->join('pegawai_m as pg', 'pg.id', '=', 'ag.picextern_id')
+                             ->select('ag.kegiatan', 'st.status','ut.unit','pg.namapegawai','st.id as stid',
+                             DB::raw("CONCAT(REPLACE(TRIM(ag.kd_list), ' ', ''), '-', ag.nourut) AS kd_list"))
+                             ->where('ag.id', $id)
+                             ->first();
+
+         if ($getDataAgenda) {
+             $newIds = Activity::max('id') ?? 0;
+             $statusText = $getDataAgenda->kegiatan . 
+                         ' Dengan Status = ' . $getDataAgenda->status . 
+                         ' di unit - ' . $getDataAgenda->unit . 
+                         ' dengan PIC ' . $getDataAgenda->namapegawai . 
+                         ' pada tgl ' . $request->tgl_selesai;
+
+             Activity::insert([
+                 'id' => $newIds + 1,
+                 'statusenabled' => true,
+                 'aktifitas' => $statusText,
+                 'kd_list' => $getDataAgenda->kd_list,
+                 'status' => $getDataAgenda->status,
+                 'created_at' => $today,
+                 'agenda_id' => $id,
+             ]);
+         }
+
+         return redirect()->back()->with('success', 'Status berhasil diupdate.');
+     }
+
+     public function saveMeetingNotes(Request $request, $meeting_result_id)
+     {
+         $today = Carbon::now();
+         $meetingResult = MeetingResult::findOrFail($meeting_result_id);
+
+         $request->validate([
+             'tgl_realisasi' => 'required|date',
+             'notulen' => 'required|string',
+             'project_id' => 'nullable|exists:project,id',
+             'action_items' => 'nullable|array',
+             'action_items.*.description' => 'required|string',
+             'action_items.*.category_id' => 'required|exists:master_action_category,id',
+             'action_items.*.unit_id' => 'required|exists:unit_m,id',
+             'action_items.*.pic_person_id' => 'required|exists:users,id',
+             'action_items.*.priority_id' => 'required|exists:master_priority,id',
+             'action_items.*.target_date' => 'required|date',
+         ]);
+
+         // 1. Update meeting result status
+         $hasActionItems = $request->action_items && count($request->action_items) > 0;
+         $meetingResult->status = $hasActionItems ? 'On Going' : 'Done';
+         $meetingResult->notes = $request->notulen;
+         $meetingResult->tgl_realisasi = $request->tgl_realisasi;
+         $meetingResult->project_id = $request->project_id;
+         $meetingResult->save();
+
+         // Update parent agenda status to Done (25)
+         AgendaMeeting::where('id', $meetingResult->agenda_meeting_id)->update(['status_id' => 25]);
+
+         // 2. Insert into meeting_notes
+         MeetingNotes::create([
+             'meeting_result_id' => $meeting_result_id,
+             'notulen' => $request->notulen,
+             'tgl_realisasi' => $request->tgl_realisasi,
+             'statusenabled' => true
+         ]);
+
+         // 3. Save Action Items
+         $openStatusId = MasterActionStatus::where('name', 'Open')->value('id');
+         if ($request->action_items) {
+             foreach ($request->action_items as $item) {
+                 $actionItem = ActionItem::create([
+                     'meeting_result_id' => $meeting_result_id,
+                     'project_id' => $request->project_id,
+                     'description' => $item['description'],
+                     'category_id' => $item['category_id'],
+                     'unit_id' => $item['unit_id'],
+                     'pic_person_id' => $item['pic_person_id'],
+                     'priority_id' => $item['priority_id'],
+                     'target_date' => $item['target_date'],
+                     'status_id' => $openStatusId,
+                     'statusenabled' => true
+                 ]);
+
+                 // Auto-dispatch based on category:
+                 // Non Develop -> project_activity
+                 // Develop -> timeline request (jadwal_t & activity_t)
+                 $category = MasterActionCategory::find($item['category_id']);
+                 $categoryName = $category ? trim(strtolower($category->name)) : '';
+
+                 if ($categoryName === 'non develop') {
+                     // Get priority name from master_priority
+                     $priorityObj = MasterPriority::find($item['priority_id']);
+                     $priorityName = $priorityObj ? $priorityObj->name : 'Low';
+                     $prioritasMId = Prioritas::where('namaprioritas', 'ilike', '%' . trim($priorityName) . '%')->value('id') 
+                                     ?? Prioritas::where('statusenabled', true)->value('id');
+
+                     // Resolve Pegawai ID for PIC
+                     $userObj = User::find($item['pic_person_id']);
+                     $picId = ($userObj && $userObj->pegawai_id) ? $userObj->pegawai_id : Pegawai::where('statusenabled', true)->value('id');
+
+                     $paMaxId = ProjectActivity::max('id') ?? 0;
+                     ProjectActivity::create([
+                         'id' => $paMaxId + 1,
+                         'prioritas_id' => $prioritasMId,
+                         'site_id' => $meetingResult->agendaMeeting->site_id,
+                         'pic_id' => $picId,
+                         'tgl_masuk' => $request->tgl_realisasi ?? date('Y-m-d'),
+                         'tgl_deadline' => $item['target_date'],
+                         'task' => $item['description'],
+                         'statusenabled' => true
+                     ]);
+
+                     if (DB::getDriverName() === 'pgsql') {
+                         DB::statement("SELECT setval('project_activity_id_seq', (SELECT MAX(id) FROM project_activity))");
+                     }
+                 } elseif ($categoryName === 'develop') {
+                     // Get priority
+                     $priorityObj = MasterPriority::find($item['priority_id']);
+                     $priorityName = $priorityObj ? $priorityObj->name : 'Low';
+                     $prioritasMId = Prioritas::where('namaprioritas', 'ilike', '%' . trim($priorityName) . '%')->value('id') 
+                                     ?? Prioritas::where('statusenabled', true)->value('id');
+
+                     // Resolve Pegawai IDs
+                     $userObj = User::find($item['pic_person_id']);
+                     $picDevId = ($userObj && $userObj->pegawai_id) ? $userObj->pegawai_id : Pegawai::where('statusenabled', true)->value('id');
+                     $picReqId = $meetingResult->agendaMeeting->picintern_id ?? Pegawai::where('statusenabled', true)->value('id');
+
+                     // Resolve Site code and increment sequence for nourut
+                     $kdSite = Site::where('id', $meetingResult->agendaMeeting->site_id)->value('kdsite');
+                     $kdSiteClean = trim($kdSite);
+                     $count = Jadwal::where('kd_list', $kdSiteClean)->count() + 1;
+
+                     // Resolve timeline_id based on target date
+                     $timelineId = Timeline::where('tgl_deadline', '>=', $item['target_date'])
+                         ->where('statusenabled', true)
+                         ->orderBy('tgl_deadline', 'asc')
+                         ->value('id');
+
+                     // Default timeline_id if none matched
+                     if (!$timelineId) {
+                         $timelineId = Timeline::where('statusenabled', true)->orderBy('tgl_deadline', 'desc')->value('id');
+                     }
+
+                     $newJadwalId = Jadwal::max('id') ?? 0;
+                     Jadwal::insert([
+                         'id' => $newJadwalId + 1,
+                         'prioritas_id' => $prioritasMId,
+                         'jenistask_id' => 7, // Request type
+                         'site_id' => $meetingResult->agendaMeeting->site_id,
+                         'timeline_id' => $timelineId,
+                         'tgl_masuk' => $request->tgl_realisasi ?? date('Y-m-d'),
+                         'tgl_deadline' => $item['target_date'],
+                         'task' => $item['description'],
+                         'picrequest_id' => $picReqId,
+                         'picdeveloper_id' => $picDevId,
+                         'developer_status_id' => 1, // Not Yet
+                         'server_status_id' => 6, // Not Yet
+                         'picrequest_status_id' => 11, // Not Yet
+                         'final_status_id' => 17, // Not Yet
+                         'statusenabled' => true,
+                         'kd_list' => $kdSiteClean,
+                         'nourut' => $count,
+                         'created_at' => now(),
+                         'updated_at' => null
+                     ]);
+
+                     // Insert into Activity
+                     $newActivityId = Activity::max('id') ?? 0;
+                     Activity::insert([
+                         'id' => $newActivityId + 1,
+                         'statusenabled' => true,
+                         'aktifitas' => $item['description'],
+                         'status' => 'Not Yet',
+                         'kd_list' => $kdSiteClean . '-' . $count,
+                         'jadwal_id' => $newJadwalId + 1,
+                         'created_at' => now(),
+                         'updated_at' => null
+                     ]);
+                 }
+
+                 // Audit log for action item
+                 AuditLog::create([
+                     'user_id' => Auth::id(),
+                     'activity' => 'Action Item dibuat',
+                     'details' => 'Membuat action item: "' . substr($actionItem->description, 0, 50) . '..." untuk meeting ' . $meetingResult->meeting_code
+                 ]);
+             }
+         }
+
+         // 4. Update project progress
+         if ($request->project_id) {
+             $projectId = $request->project_id;
+             $totalItems = ActionItem::where('project_id', $projectId)->where('statusenabled', true)->count();
+             $doneStatusId = MasterActionStatus::where('name', 'Done')->value('id');
+             $doneItems = ActionItem::where('project_id', $projectId)->where('status_id', $doneStatusId)->where('statusenabled', true)->count();
+             $progress = $totalItems > 0 ? round(($doneItems / $totalItems) * 100, 2) : 0;
+             Project::where('id', $projectId)->update(['progress' => $progress]);
+         }
+
+         // Audit log for meeting
+         AuditLog::create([
+             'user_id' => Auth::id(),
+             'activity' => 'Meeting selesai',
+             'details' => 'Mengisi notulen dan action items untuk meeting ' . $meetingResult->meeting_code
+         ]);
+
+         return redirect()->route('dashboard.agenda')->with('success', 'Hasil meeting berhasil disimpan!');
+     }
+
+      public function getMeetingDetail($meeting_result_id)
+      {
+          $meeting = MeetingResult::with([
+              'agendaMeeting.site',
+              'agendaMeeting.jam',
+              'agendaMeeting.parties',
+              'agendaMeeting.unit',
+              'agendaMeeting.picInternal',
+              'agendaMeeting.picExternal',
+              'project',
+              'actionItems.category',
+              'actionItems.unit',
+              'actionItems.picPerson',
+              'actionItems.priority',
+              'actionItems.status',
+              'actionItems.progressUpdates.creator'
+          ])->findOrFail($meeting_result_id);
+
+          // Resolve live status directly from source tables
+          foreach ($meeting->actionItems as $item) {
+              $liveStatus = 'Open'; // Default fallback
+              $categoryName = $item->category ? trim(strtolower($item->category->name)) : '';
+
+              if ($categoryName === 'non develop') {
+                  $userObj = User::find($item->pic_person_id);
+                  $picId = ($userObj && $userObj->pegawai_id) ? $userObj->pegawai_id : null;
+
+                  $paQuery = ProjectActivity::where('site_id', $meeting->agendaMeeting->site_id)
+                      ->where('task', $item->description)
+                      ->where('tgl_deadline', $item->target_date)
+                      ->where('statusenabled', true);
+                  if ($picId) {
+                      $paQuery->where('pic_id', $picId);
+                  }
+                  $pa = $paQuery->first();
+                  if ($pa) {
+                      $liveStatus = $pa->status; // 'Open', 'Done', etc.
+                  }
+              } elseif ($categoryName === 'develop') {
+                  $userObj = User::find($item->pic_person_id);
+                  $picDevId = ($userObj && $userObj->pegawai_id) ? $userObj->pegawai_id : null;
+
+                  $jadwalQuery = Jadwal::where('site_id', $meeting->agendaMeeting->site_id)
+                      ->where('task', $item->description)
+                      ->where('tgl_deadline', $item->target_date)
+                      ->where('statusenabled', true);
+                  if ($picDevId) {
+                      $jadwalQuery->where('picdeveloper_id', $picDevId);
+                  }
+                  $jadwal = $jadwalQuery->first();
+                  if ($jadwal) {
+                      $finalStatusName = DB::table('status_m')->where('id', $jadwal->final_status_id)->value('status');
+                      if ($finalStatusName) {
+                          $liveStatus = trim($finalStatusName);
+                      }
+                  }
+              }
+              $item->live_status = $liveStatus;
+          }
+
+          return view('detail-meeting', compact('meeting'));
+      }
+
+      public function getAgendaTimeline($id)
+      {
+          $meetingResults = MeetingResult::where('agenda_meeting_id', $id)
+              ->where('statusenabled', true)
+              ->orderBy('id', 'asc')
+              ->get();
+
+          $formatted = $meetingResults->map(function ($mr) {
+              return [
+                  'meeting_code' => $mr->meeting_code,
+                  'status' => trim($mr->status),
+                  'tgl_realisasi' => $mr->tgl_realisasi ? \Carbon\Carbon::parse($mr->tgl_realisasi)->format('Y-m-d') : 'Belum Realisasi',
+                  'notes' => $mr->notes ?? 'Belum ada notulen rapat.'
+              ];
+          });
+
+          return response()->json([
+              'success' => true,
+              'timeline' => $formatted
+          ]);
+      }
+
+    public function getProjectTracker(Request $request)
     {
-        $today = carbon::now();
-        $id = intval($request->id); // Ubah ke integer
+        // Fetch all active sites for the filter dropdown
+        $sites = Site::where('statusenabled', true)->orderBy('namasite')->get();
 
-        $updateJadwal = Agenda::find($id);
-        $updateJadwal->status_id = $request->statusid;
-        $updateJadwal->tgl_realisasi = $request->tgl_selesai;
-        $updateJadwal->updated_at = $today;
-        $updateJadwal->save();
+        // Get selected site ID (default to first active site if null)
+        $selectedSiteId = $request->input('site_id');
+        if (!$selectedSiteId && $sites->isNotEmpty()) {
+            $selectedSiteId = $sites->first()->id;
+        }
 
-        $getDataAgenda = Agenda::from('agenda_t as ag')
-                            ->join('status_m as st', 'st.id', '=', 'ag.status_id')
-                            ->join('unit_m as ut', 'ut.id', '=', 'ag.unit_id')
-                            ->join('pegawai_m as pg', 'pg.id', '=', 'ag.picextern_id')
-                            ->select('ag.kegiatan', 'st.status','ut.unit','pg.namapegawai','st.id as stid',
-                            DB::raw("CONCAT(REPLACE(TRIM(ag.kd_list), ' ', ''), '-', ag.nourut) AS kd_list"))
-                            ->where('ag.id', $id)
-                            ->first(); // Ambil satu data saja
-                        // Pastikan $getDataDev tidak null
-                        if ($getDataAgenda) {
-                            $newIds = Activity::max('id') ?? 0;
+        // 1. Query Project Activities
+        $projectActivities = ProjectActivity::with(['prioritas', 'pic'])
+            ->where('site_id', $selectedSiteId)
+            ->where('statusenabled', true)
+            ->get();
 
-                            $statusText = $getDataAgenda->kegiatan . 
-                                        ' Dengan Status = ' . $getDataAgenda->status . 
-                                        ' di unit - ' . $getDataAgenda->unit . 
-                                        ' dengan PIC ' . $getDataAgenda->namapegawai . 
-                                        ' pada tgl ' . $request->tgl_selesai;
+        // 2. Query Timeline Requests (Jadwal)
+        $timelineRequests = Jadwal::from('jadwal_t as jt')
+            ->leftJoin('prioritas_m as pr', 'pr.id', '=', 'jt.prioritas_id')
+            ->leftJoin('jenistask_m as js', 'js.id', '=', 'jt.jenistask_id')
+            ->leftJoin('timeline_m as tm', 'tm.id', '=', 'jt.timeline_id')
+            ->leftJoin('pegawai_m as pg_req', 'pg_req.id', '=', 'jt.picrequest_id')
+            ->leftJoin('pegawai_m as pg_dev', 'pg_dev.id', '=', 'jt.picdeveloper_id')
+            ->leftJoin('status_m as st', 'st.id', '=', 'jt.final_status_id')
+            ->where('jt.site_id', $selectedSiteId)
+            ->where('jt.statusenabled', true)
+            ->select(
+                'jt.id',
+                'jt.tgl_masuk',
+                'jt.tgl_deadline',
+                'jt.task',
+                'jt.kd_list',
+                'jt.nourut',
+                'jt.final_status_id',
+                'pr.namaprioritas',
+                'js.jenistask',
+                'tm.gabung as timeline_name',
+                'pg_req.namapegawai as pic_requestor',
+                'pg_dev.namapegawai as pic_developer',
+                'st.status as final_status'
+            )
+            ->get();
 
-                            Activity::insert([
-                                'id' => $newIds + 1,
-                                'statusenabled' => true,
-                                'aktifitas' => $statusText,
-                                'kd_list' => $getDataAgenda->kd_list,
-                                'status' => $getDataAgenda->status,
-                                'created_at' => $today,
-                                'agenda_id' => $id,
-                            ]);
-                        }
+        // Calculations
+        $totalPA = $projectActivities->count();
+        $donePA = $projectActivities->where('status', 'Done')->count();
+        $undonePA = $totalPA - $donePA;
 
-        return redirect()->back()->with('success', 'Status berhasil diupdate.');
+        $totalTR = $timelineRequests->count();
+        $doneTR = $timelineRequests->where('final_status_id', 19)->count();
+        $undoneTR = $totalTR - $doneTR;
+
+        $combinedTotal = $totalPA + $totalTR;
+        $combinedDone = $donePA + $doneTR;
+        $combinedUndone = $undonePA + $undoneTR;
+
+        $donePercentage = $combinedTotal > 0 ? round(($combinedDone / $combinedTotal) * 100, 2) : 0;
+        $undonePercentage = $combinedTotal > 0 ? round(($combinedUndone / $combinedTotal) * 100, 2) : 0;
+
+        // Filter out completed tasks for the lists
+        $unfinishedPA = $projectActivities->where('status', '<>', 'Done');
+        $unfinishedTR = $timelineRequests->where('final_status_id', '<>', 19);
+
+        return view('project-tracker', compact(
+            'sites',
+            'selectedSiteId',
+            'combinedTotal',
+            'combinedDone',
+            'combinedUndone',
+            'donePercentage',
+            'undonePercentage',
+            'unfinishedPA',
+            'unfinishedTR'
+        ));
     }
+
+     public function saveProject(Request $request)
+     {
+         $request->validate([
+             'project_code' => 'required|string|unique:project,project_code',
+             'project_name' => 'required|string',
+             'site_id' => 'required|exists:site_m,id',
+             'start_date' => 'nullable|date',
+             'target_date' => 'nullable|date|after_or_equal:start_date',
+             'status' => 'required|string'
+         ]);
+
+         $project = Project::create([
+             'project_code' => $request->project_code,
+             'project_name' => $request->project_name,
+             'site_id' => $request->site_id,
+             'description' => $request->description,
+             'start_date' => $request->start_date,
+             'target_date' => $request->target_date,
+             'status' => $request->status,
+             'progress' => 0,
+             'statusenabled' => true
+         ]);
+
+         AuditLog::create([
+             'user_id' => Auth::id(),
+             'activity' => 'Project dibuat',
+             'details' => 'Membuat project: ' . $project->project_name . ' (Kode: ' . $project->project_code . ')'
+         ]);
+
+         return redirect()->back()->with('success', 'Project berhasil disimpan!');
+     }
+
+     public function updateActionItem(Request $request, $action_item_id)
+     {
+         $actionItem = ActionItem::findOrFail($action_item_id);
+
+         $request->validate([
+             'status_id' => 'required|exists:master_action_status,id',
+             'priority_id' => 'required|exists:master_priority,id',
+             'pic_person_id' => 'required|exists:users,id',
+             'target_date' => 'required|date',
+             'progress_notes' => 'nullable|string',
+             'attachment' => 'nullable|file|mimes:pdf,jpg,png,jpeg,doc,docx|max:5120'
+         ]);
+
+         // Update fields
+         $actionItem->status_id = $request->status_id;
+         $actionItem->priority_id = $request->priority_id;
+         $actionItem->pic_person_id = $request->pic_person_id;
+         $actionItem->target_date = $request->target_date;
+         $actionItem->save();
+
+         // Save progress updates if notes are supplied
+         if ($request->progress_notes) {
+             $attachmentPath = null;
+             if ($request->hasFile('attachment')) {
+                 $file = $request->file('attachment');
+                 $filename = time() . '_' . $file->getClientOriginalName();
+                 $file->move('attachments', $filename);
+                 $attachmentPath = 'attachments/' . $filename;
+             }
+
+             ActionItemProgress::create([
+                 'action_item_id' => $action_item_id,
+                 'progress_date' => now()->format('Y-m-d'),
+                 'notes' => $request->progress_notes,
+                 'attachment' => $attachmentPath,
+                 'created_by' => Auth::id()
+             ]);
+
+             AuditLog::create([
+                 'user_id' => Auth::id(),
+                 'activity' => 'Progress ditambahkan',
+                 'details' => 'Menambahkan log progres for Action Item ID: ' . $action_item_id
+             ]);
+         }
+
+         // Audit logging for action item modification
+         AuditLog::create([
+             'user_id' => Auth::id(),
+             'activity' => 'Action Item diubah',
+             'details' => 'Memperbarui status/prioritas Action Item ID: ' . $action_item_id
+         ]);
+
+         // Recalculate project progress
+         if ($actionItem->project_id) {
+             $projectId = $actionItem->project_id;
+             $totalItems = ActionItem::where('project_id', $projectId)->where('statusenabled', true)->count();
+             $doneStatusId = MasterActionStatus::where('name', 'Done')->value('id');
+             $doneItems = ActionItem::where('project_id', $projectId)->where('status_id', $doneStatusId)->where('statusenabled', true)->count();
+             $progress = $totalItems > 0 ? round(($doneItems / $totalItems) * 100, 2) : 0;
+             Project::where('id', $projectId)->update(['progress' => $progress]);
+         }
+
+         return redirect()->back()->with('success', 'Action Item berhasil diperbarui!');
+     }
 
     public function getDataDaily()
     {
@@ -877,4 +1428,139 @@ class AntrianController extends Controller
         return redirect()->back()->with('success', 'Weekly Report berhasil disimpan.');
     }
 
+    public function getProjectActivity()
+    {
+        $projectActivities = ProjectActivity::with(['prioritas', 'site', 'pic'])
+            ->where('statusenabled', true)
+            ->orderBy('tgl_deadline', 'asc')
+            ->get();
+
+        $priorities = Prioritas::where('statusenabled', true)->get();
+        $sites = Site::where('statusenabled', true)->get();
+        $pics = Pegawai::where('statusenabled', true)->get();
+
+        return view('project-activity', compact('projectActivities', 'priorities', 'sites', 'pics'));
+    }
+
+    public function saveProjectActivity(Request $request)
+    {
+        $request->validate([
+            'prioritas_id' => 'required|exists:prioritas_m,id',
+            'site_id' => 'required|exists:site_m,id',
+            'pic_id' => 'required|exists:pegawai_m,id',
+            'tgl_masuk' => 'required|date',
+            'tgl_deadline' => 'required|date|after_or_equal:tgl_masuk',
+            'task' => 'required|string',
+            'status' => 'required|string',
+        ]);
+
+        $newId = ProjectActivity::max('id') ?? 0;
+
+        ProjectActivity::create([
+            'id' => $newId + 1,
+            'prioritas_id' => $request->prioritas_id,
+            'site_id' => $request->site_id,
+            'pic_id' => $request->pic_id,
+            'tgl_masuk' => $request->tgl_masuk,
+            'tgl_deadline' => $request->tgl_deadline,
+            'task' => $request->task,
+            'status' => $request->status,
+            'statusenabled' => true,
+        ]);
+
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("SELECT setval('project_activity_id_seq', (SELECT MAX(id) FROM project_activity))");
+        }
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Project Activity dibuat',
+            'details' => 'Membuat project activity: ' . substr($request->task, 0, 50) . '...'
+        ]);
+
+        return redirect()->back()->with('success', 'Project Activity berhasil disimpan!');
+    }
+
+    public function updateProjectActivity(Request $request, $id)
+    {
+        $activity = ProjectActivity::findOrFail($id);
+
+        $request->validate([
+            'prioritas_id' => 'required|exists:prioritas_m,id',
+            'site_id' => 'required|exists:site_m,id',
+            'pic_id' => 'required|exists:pegawai_m,id',
+            'tgl_masuk' => 'required|date',
+            'tgl_deadline' => 'required|date|after_or_equal:tgl_masuk',
+            'task' => 'required|string',
+            'status' => 'required|string',
+        ]);
+
+        $activity->update([
+            'prioritas_id' => $request->prioritas_id,
+            'site_id' => $request->site_id,
+            'pic_id' => $request->pic_id,
+            'tgl_masuk' => $request->tgl_masuk,
+            'tgl_deadline' => $request->tgl_deadline,
+            'task' => $request->task,
+            'status' => $request->status,
+        ]);
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Project Activity diubah',
+            'details' => 'Memperbarui project activity ID: ' . $id
+        ]);
+
+        return redirect()->back()->with('success', 'Project Activity berhasil diperbarui!');
+    }
+
+    public function deleteProjectActivity($id)
+    {
+        $activity = ProjectActivity::findOrFail($id);
+        $activity->update(['statusenabled' => false]);
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Project Activity dihapus',
+            'details' => 'Menghapus project activity ID: ' . $id
+        ]);
+
+        return redirect()->back()->with('success', 'Project Activity berhasil dihapus!');
+    }
+
+    public function createFollowupMeeting($parent_meeting_result_id)
+    {
+        $parent = MeetingResult::findOrFail($parent_meeting_result_id);
+
+        if (trim($parent->status) !== 'On Going') {
+            return redirect()->back()->with('error', 'Hanya rapat berstatus On Going yang dapat dibuat tindak lanjutnya.');
+        }
+
+        $agenda = $parent->agendaMeeting;
+
+        // Calculate new code
+        $kdSite = Site::where('id', $agenda->site_id)->value('kdsite');
+        $kdSiteClean = trim($kdSite);
+        $existingCount = MeetingResult::where('agenda_meeting_id', $agenda->id)->count();
+        $newCode = 'MEET-' . $kdSiteClean . '-' . $agenda->nourut . '-F' . $existingCount;
+
+        $newMeeting = MeetingResult::create([
+            'meeting_code' => $newCode,
+            'agenda_meeting_id' => $agenda->id,
+            'project_id' => $parent->project_id,
+            'status' => 'Pending',
+            'statusenabled' => true
+        ]);
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Tindak lanjut rapat dibuat',
+            'details' => 'Membuat tindak lanjut rapat ' . $newCode . ' dari rapat induk ' . $parent->meeting_code
+        ]);
+
+        return redirect()->back()->with('success', 'Rapat tindak lanjut ' . $newCode . ' berhasil dibuat!');
+    }
+
 }
+
+
