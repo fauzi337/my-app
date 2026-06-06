@@ -94,11 +94,14 @@ class AntrianController extends Controller
                             ->join('jenistask_m as js','js.id','=','jt.jenistask_id')
                             ->join('timeline_m as tm','tm.id','=','jt.timeline_id')
                             ->join('site_m as si','si.id','=','jt.site_id')
+                            ->join('status_m as st','st.id','=','jt.developer_status_id')
+                            ->leftJoin('pegawai_m as pg_dev','pg_dev.id','=','jt.picdeveloper_id')
                             ->where('jt.developer_status_id',1)
                             ->where('jt.statusenabled',true)
-                            ->select('jt.kd_list','pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline',
+                            ->select('jt.id', 'jt.prioritas_id', 'jt.jenistask_id', 'jt.site_id', 'jt.timeline_id', 'jt.picrequest_id', 'jt.picdeveloper_id', 'pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','st.status as devstatus','pg_dev.namapegawai as pic_developer',
                             DB::raw("CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"))
-                            ->orderBy('jt.created_at')
+                            ->orderBy('si.namasite')
+                            ->orderBy('jt.created_at', 'desc')
                             ->get();
 
         $pegawai = Pegawai::where('statusenabled', true)
@@ -234,7 +237,7 @@ class AntrianController extends Controller
                             ->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','st.id as devstid','jt.id',
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"),
                                     'st.status as devstatus','st2.status as servstatus','st2.id as servstid','st3.id as picreqstid')
-                            ->orderBy('jt.prioritas_id', 'desc')
+                            ->orderBy('si.namasite')
                             ->orderBy('jt.created_at', 'desc')
                             ->get();
 
@@ -291,7 +294,6 @@ class AntrianController extends Controller
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"),
                                     'st.status as devstatus','st2.status as servstatus','st3.status as picreqst','st3.id as picreqstid','st4.id as finalstid','st4.status as finalst','jt.path',
                                     'st.id as devstid')
-                            ->orderBy('jt.prioritas_id','desc')
                             ->orderBy('jt.created_at','desc')
                             ->get();
                             // dd($listPicReq);
@@ -932,7 +934,7 @@ class AntrianController extends Controller
                          'tgl_deadline' => $item['target_date'],
                          'task' => $item['description'],
                          'picrequest_id' => $picReqId,
-                         'picdeveloper_id' => $picDevId,
+                         'picdeveloper_id' => null,
                          'developer_status_id' => 1, // Not Yet
                          'server_status_id' => 6, // Not Yet
                          'picrequest_status_id' => 11, // Not Yet
@@ -1034,7 +1036,10 @@ class AntrianController extends Controller
                       ->where('tgl_deadline', $item->target_date)
                       ->where('statusenabled', true);
                   if ($picDevId) {
-                      $jadwalQuery->where('picdeveloper_id', $picDevId);
+                      $jadwalQuery->where(function($q) use ($picDevId) {
+                          $q->where('picdeveloper_id', $picDevId)
+                            ->orWhereNull('picdeveloper_id');
+                      });
                   }
                   $jadwal = $jadwalQuery->first();
                   if ($jadwal) {
@@ -1559,6 +1564,96 @@ class AntrianController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Rapat tindak lanjut ' . $newCode . ' berhasil dibuat!');
+    }
+
+    public function updateJadwal(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'prioritas_id' => 'required',
+            'jenistask_id' => 'required',
+            'site_id' => 'required',
+            'timeline_id' => 'required',
+            'tgl_masuk' => 'required|date',
+            'tgl_deadline' => 'required|date|after_or_equal:tgl_masuk',
+            'task' => 'required|string',
+            'picrequest_id' => 'required',
+            'picdeveloper_id' => 'required',
+        ]);
+
+        $jadwal = Jadwal::findOrFail($id);
+        
+        // Update kd_list and nourut if site has changed
+        if ($jadwal->site_id != $request->site_id) {
+            $kdSite = Site::where('statusenabled', true)
+                            ->where('id', $request->site_id)
+                            ->value('kdsite');
+            $count = Jadwal::where('kd_list', $kdSite)->count() + 1;
+            $jadwal->kd_list = trim($kdSite);
+            $jadwal->nourut = $count;
+        }
+
+        $jadwal->update([
+            'prioritas_id' => $request->prioritas_id,
+            'jenistask_id' => $request->jenistask_id,
+            'site_id' => $request->site_id,
+            'timeline_id' => $request->timeline_id,
+            'tgl_masuk' => $validated['tgl_masuk'],
+            'tgl_deadline' => $request->tgl_deadline,
+            'task' => $validated['task'],
+            'picrequest_id' => $request->picrequest_id,
+            'picdeveloper_id' => $request->picdeveloper_id,
+            'updated_at' => now(),
+        ]);
+
+        // Also update legacy activities if they exist
+        Activity::where('jadwal_id', $id)->update([
+            'aktifitas' => $validated['task'],
+        ]);
+
+        return redirect()->back()->with('success', 'Timeline Request berhasil diperbarui!');
+    }
+
+    public function deleteJadwal($id)
+    {
+        $jadwal = Jadwal::findOrFail($id);
+        $jadwal->update(['statusenabled' => false]);
+
+        return redirect()->back()->with('success', 'Timeline Request berhasil dihapus!');
+    }
+
+    public function uploadAudio(Request $request, $meeting_result_id)
+    {
+        $request->validate([
+            'audio_file' => 'required|file',
+        ]);
+
+        $meetingResult = MeetingResult::findOrFail($meeting_result_id);
+
+        if ($request->hasFile('audio_file')) {
+            $file = $request->file('audio_file');
+            $filename = 'audio_' . $meetingResult->id . '_' . time() . '.webm';
+            $file->move('meeting_audios', $filename);
+
+            if ($meetingResult->audio_path) {
+                $oldPath = public_path($meetingResult->audio_path);
+                if (file_exists($oldPath)) {
+                    @unlink($oldPath);
+                }
+            }
+
+            $meetingResult->audio_path = 'meeting_audios/' . $filename;
+            $meetingResult->save();
+
+            return response()->json([
+                'success' => true,
+                'audio_path' => $meetingResult->audio_path
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal mengupload file audio.'
+        ], 400);
     }
 
 }

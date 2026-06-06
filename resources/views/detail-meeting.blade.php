@@ -106,6 +106,19 @@
                     {{ $meeting->notes ?? 'Belum ada notulen rapat.' }}
                 </p>
             </div>
+
+            @if($meeting->audio_path)
+            <div class="border-t pt-4 space-y-2">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Rekaman Audio Rapat</span>
+                <div class="bg-gray-50/50 p-3 rounded-lg border border-gray-200 flex items-center gap-3">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-gray-600">
+                        <i class="bi bi-file-earmark-music text-orange-500 text-base"></i>
+                        <span>File Rekaman:</span>
+                    </div>
+                    <audio src="{{ asset($meeting->audio_path) }}" controls class="w-full max-w-md"></audio>
+                </div>
+            </div>
+            @endif
         </div>
 
         <!-- SECTION C: DAFTAR ACTION ITEM -->

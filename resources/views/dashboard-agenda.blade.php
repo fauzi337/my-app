@@ -339,7 +339,7 @@
                                             class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded shadow-sm transition-all @if($item->status == 'Done' || $item->status == 'On Going') opacity-50 pointer-events-none @endif" 
                                             data-bs-toggle="modal" 
                                             data-bs-target="#meetingNotesModal"
-                                            onclick="setNotesId('{{ $item->id }}', '{{ $item->meeting_code }}', '{{ addslashes($item->kegiatan) }}', '{{ addslashes($item->namasite) }}', '{{ $item->unit_id }}')">
+                                            onclick="setNotesId('{{ $item->id }}', '{{ $item->meeting_code }}', '{{ addslashes($item->kegiatan) }}', '{{ addslashes($item->namasite) }}', '{{ $item->unit_id }}', '{{ $item->audio_path }}')">
                                             <i class="bi bi-pencil-square"></i> Notes
                                         </button>
                                         <!-- Detail Link -->
@@ -410,10 +410,165 @@
                     actionItems: [],
                     extractText: '',
                     showExtract: false,
+                    meetingResultId: '',
                     meetingCode: '',
                     kegiatan: '',
                     site: '',
                     unitId: '',
+                    audioPath: '',
+                    notulenText: '',
+                    
+                    // Recording States
+                    isRecording: false,
+                    audioBlob: null,
+                    mediaRecorder: null,
+                    recognition: null,
+                    recordedText: '',
+                    recordingSeconds: 0,
+                    recordingInterval: null,
+                    audioUrl: null,
+                    showOptions: false,
+                    isUploading: false,
+                    errorMessage: '',
+
+                    get recordingDuration() {
+                        const mins = Math.floor(this.recordingSeconds / 60).toString().padStart(2, '0');
+                        const secs = (this.recordingSeconds % 60).toString().padStart(2, '0');
+                        return `${mins}:${secs}`;
+                    },
+
+                    async startRecording() {
+                        this.errorMessage = '';
+                        this.audioBlob = null;
+                        this.audioUrl = null;
+                        this.showOptions = false;
+                        this.recordedText = '';
+
+                        try {
+                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            this.mediaRecorder = new MediaRecorder(stream);
+                            let chunks = [];
+
+                            this.mediaRecorder.ondataavailable = (e) => {
+                                if (e.data.size > 0) {
+                                    chunks.push(e.data);
+                                }
+                            };
+
+                            this.mediaRecorder.onstop = () => {
+                                this.audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                                this.audioUrl = URL.createObjectURL(this.audioBlob);
+                                this.showOptions = true;
+                                
+                                // Stop all audio tracks
+                                stream.getTracks().forEach(track => track.stop());
+                            };
+
+                            // Setup Speech Recognition
+                            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                            if (SpeechRecognition) {
+                                this.recognition = new SpeechRecognition();
+                                this.recognition.continuous = true;
+                                this.recognition.interimResults = true;
+                                this.recognition.lang = 'id-ID';
+
+                                this.recognition.onresult = (event) => {
+                                    let interimTranscript = '';
+                                    let finalTranscript = '';
+                                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                                        if (event.results[i].isFinal) {
+                                            finalTranscript += event.results[i][0].transcript;
+                                        } else {
+                                            interimTranscript += event.results[i][0].transcript;
+                                        }
+                                    }
+                                    if (finalTranscript) {
+                                        this.recordedText += (this.recordedText ? ' ' : '') + finalTranscript;
+                                    }
+                                };
+
+                                this.recognition.onerror = (e) => {
+                                    console.error('Speech recognition error', e);
+                                };
+
+                                this.recognition.start();
+                            } else {
+                                console.warn('Speech recognition not supported in this browser.');
+                            }
+
+                            this.mediaRecorder.start();
+                            this.isRecording = true;
+                            this.recordingSeconds = 0;
+                            this.recordingInterval = setInterval(() => {
+                                this.recordingSeconds++;
+                            }, 1000);
+
+                        } catch (err) {
+                            console.error('Failed to get mic access', err);
+                            this.errorMessage = 'Gagal mengakses mikrofon. Pastikan izin diberikan.';
+                        }
+                    },
+
+                    stopRecording() {
+                        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                            this.mediaRecorder.stop();
+                        }
+                        if (this.recognition) {
+                            this.recognition.stop();
+                        }
+                        clearInterval(this.recordingInterval);
+                        this.isRecording = false;
+                    },
+
+                    async saveRecording(extract) {
+                        if (!this.audioBlob) return;
+                        this.isUploading = true;
+                        this.errorMessage = '';
+
+                        const formData = new FormData();
+                        formData.append('audio_file', this.audioBlob, 'recording.webm');
+                        
+                        // Get CSRF Token
+                        const token = document.querySelector('input[name=\'_token\']').value;
+                        
+                        try {
+                            const res = await fetch(`/meeting-result/${this.meetingResultId}/upload-audio`, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': token
+                                },
+                                body: formData
+                            });
+
+                            const data = await res.json();
+                            if (data.success) {
+                                this.audioPath = data.audio_path;
+
+                                if (extract) {
+                                    const textToInsert = this.recordedText.trim();
+                                    if (textToInsert) {
+                                        if (this.notulenText.trim()) {
+                                            this.notulenText += '\n\n' + textToInsert;
+                                        } else {
+                                            this.notulenText = textToInsert;
+                                        }
+                                    } else {
+                                        alert('Audio berhasil disimpan, namun tidak ada transkripsi yang terdeteksi.');
+                                    }
+                                }
+                                alert('Rekaman audio berhasil disimpan!');
+                                this.showOptions = false;
+                            } else {
+                                this.errorMessage = data.message || 'Gagal menyimpan rekaman.';
+                            }
+                        } catch (err) {
+                            console.error('Upload error', err);
+                            this.errorMessage = 'Terjadi kesalahan koneksi saat mengupload.';
+                        } finally {
+                            this.isUploading = false;
+                        }
+                    },
+
                     addActionItem() {
                         this.actionItems.push({
                             description: '',
@@ -443,16 +598,30 @@
                         this.extractText = '';
                         this.showExtract = false;
                     },
-                    initModal(code, keg, sit, unitId) {
+                    initModal(id, code, keg, sit, unitId, audioPath) {
+                        this.meetingResultId = id;
                         this.meetingCode = code;
                         this.kegiatan = keg;
                         this.site = sit;
                         this.unitId = unitId;
+                        this.audioPath = audioPath || '';
+                        this.notulenText = '';
                         this.actionItems = [];
                         this.extractText = '';
                         this.showExtract = false;
+
+                        // Reset recording state
+                        this.isRecording = false;
+                        this.audioBlob = null;
+                        this.audioUrl = null;
+                        this.showOptions = false;
+                        this.recordedText = '';
+                        this.errorMessage = '';
+                        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') { this.mediaRecorder.stop(); }
+                        if (this.recognition) { this.recognition.stop(); }
+                        clearInterval(this.recordingInterval);
                     }
-                }" @meeting-notes-open.window="initModal($event.detail.code, $event.detail.kegiatan, $event.detail.site, $event.detail.unitId)">
+                }" @meeting-notes-open.window="initModal($event.detail.id, $event.detail.code, $event.detail.kegiatan, $event.detail.site, $event.detail.unitId, $event.detail.audioPath)">
                     @csrf
                     <div class="modal-content rounded-xl overflow-hidden shadow-lg border-0">
                         <div class="modal-header bg-orange-500 text-white py-3.5">
@@ -487,25 +656,69 @@
                             </div>
 
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700">Notulen Meeting / Hasil Rapat</label>
-                                <textarea name="notulen" required class="form-control text-sm mt-1 border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" rows="3" placeholder="Tulis catatan dan kesimpulan hasil rapat..."></textarea>
-                            </div>
+                                 <label class="block text-xs font-semibold text-gray-700">Notulen Meeting / Hasil Rapat</label>
+                                 <textarea name="notulen" required x-model="notulenText" class="form-control text-sm mt-1 border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" rows="3" placeholder="Tulis catatan dan kesimpulan hasil rapat..."></textarea>
+                             </div>
+
+                             <!-- Audio Player for existing or uploaded audio -->
+                             <template x-if="audioPath">
+                                 <div class="mt-2.5 p-2.5 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between gap-3 shadow-sm">
+                                     <div class="flex items-center gap-2 text-xs font-semibold text-gray-600">
+                                         <i class="bi bi-file-earmark-music text-orange-500 text-sm"></i>
+                                         <span>Rekaman Audio Rapat:</span>
+                                     </div>
+                                     <audio :src="'/' + audioPath" controls class="h-8 max-w-xs scale-95 origin-right"></audio>
+                                 </div>
+                             </template>
 
                             <!-- Action Items Section -->
                             <div class="border-t pt-4 mt-2">
-                                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                                    <h6 class="font-bold text-sm text-gray-700 flex items-center gap-1.5 m-0">
-                                        <i class="bi bi-list-task text-orange-500"></i> Action Items Monitoring
-                                    </h6>
-                                    <div class="flex gap-2">
-                                        <button type="button" @click="showExtract = !showExtract" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white rounded transition-colors">
-                                            <i class="bi bi-file-earmark-text"></i> Extract Action Items
-                                        </button>
-                                        <button type="button" @click="addActionItem()" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded transition-colors shadow-sm">
-                                            <i class="bi bi-plus-lg"></i> Tambah Action Item
-                                        </button>
-                                    </div>
-                                </div>
+                                     <div class="flex gap-2 items-center">
+                                         <!-- Audio Recording Widget -->
+                                         <div class="flex items-center gap-1.5">
+                                             <!-- Record Trigger Button -->
+                                             <button type="button" x-show="!isRecording && !showOptions" @click="startRecording()" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold border border-red-500 text-red-500 hover:bg-red-500 hover:text-white rounded transition-colors shadow-sm">
+                                                 <i class="bi bi-mic-fill animate-pulse"></i> Record Audio
+                                             </button>
+
+                                             <!-- Recording Indicator and Stop button -->
+                                             <div x-show="isRecording" class="flex items-center gap-2 bg-red-50 border border-red-200 px-2.5 py-1 rounded text-red-600 text-xs font-semibold shadow-sm">
+                                                 <span class="inline-block w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
+                                                 <span x-text="recordingDuration">00:00</span>
+                                                 <button type="button" @click="stopRecording()" class="btn btn-sm btn-link p-0 text-red-600 font-bold border-0 hover:text-red-800 text-xs ml-1 no-underline">
+                                                     Stop
+                                                 </button>
+                                             </div>
+
+                                             <!-- Post-recording Actions -->
+                                             <div x-show="showOptions" class="flex items-center gap-2 bg-slate-50 border border-slate-200 p-1.5 rounded-lg shadow-sm">
+                                                 <!-- Tiny Preview Player -->
+                                                 <audio :src="audioUrl" controls class="h-6 w-36 scale-90 origin-left"></audio>
+                                                 
+                                                 <button type="button" @click="saveRecording(false)" :disabled="isUploading" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors shadow-sm">
+                                                     <span x-show="isUploading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                                     Simpan
+                                                 </button>
+                                                 <button type="button" @click="saveRecording(true)" :disabled="isUploading" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded transition-colors shadow-sm">
+                                                     <span x-show="isUploading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                                     Simpan + Extract
+                                                 </button>
+                                                 <button type="button" @click="showOptions = false" :disabled="isUploading" class="inline-flex items-center justify-center w-6 h-6 text-gray-500 hover:text-gray-700 rounded transition-colors text-xs border bg-white shadow-sm" title="Batal">
+                                                     <i class="bi bi-trash"></i>
+                                                 </button>
+                                             </div>
+
+                                             <!-- Error display -->
+                                             <div x-show="errorMessage" x-text="errorMessage" class="text-[10px] text-red-500 font-medium max-w-xs truncate"></div>
+                                         </div>
+
+                                         <button type="button" @click="showExtract = !showExtract" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white rounded transition-colors">
+                                             <i class="bi bi-file-earmark-text"></i> Extract Action Items
+                                         </button>
+                                         <button type="button" @click="addActionItem()" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded transition-colors shadow-sm">
+                                             <i class="bi bi-plus-lg"></i> Tambah Action Item
+                                         </button>
+                                     </div>
 
                                 <!-- Extract Action Items Textarea -->
                                 <div x-show="showExtract" class="p-3 bg-gray-50 border border-gray-200 rounded-lg mb-3 space-y-2">
@@ -679,13 +892,13 @@
             form.action = `/update-statusagenda/${id}`;
         }
 
-        function setNotesId(id, code, kegiatan, site, unitId) {
+        function setNotesId(id, code, kegiatan, site, unitId, audioPath) {
             const form = document.getElementById('meetingNotesForm');
             form.action = `/save-meeting-notes/${id}`;
             
             // Dispatch event to Alpine in modal
             window.dispatchEvent(new CustomEvent('meeting-notes-open', {
-                detail: { code, kegiatan, site, unitId }
+                detail: { id, code, kegiatan, site, unitId, audioPath }
             }));
         }
 
