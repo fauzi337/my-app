@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
 
     // Meeting Management & Project Tracker Routes
     Route::post('/save-meeting-notes/{meeting_result_id}', [AntrianController::class, 'saveMeetingNotes'])->name('meeting.notes.save');
+    Route::post('/meeting-result/{meeting_result_id}/upload-audio', [AntrianController::class, 'uploadAudio'])->name('meeting.upload-audio');
     Route::get('/meeting-detail/{meeting_result_id}', [AntrianController::class, 'getMeetingDetail'])->name('meeting.detail');
     Route::get('/agenda-timeline/{id}', [AntrianController::class, 'getAgendaTimeline'])->name('agenda.timeline');
     Route::get('/project-tracker', [AntrianController::class, 'getProjectTracker'])->name('project.tracker');
@@ -45,6 +46,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/save-project-activity', [AntrianController::class, 'saveProjectActivity'])->name('project.activity.save');
     Route::post('/update-project-activity/{id}', [AntrianController::class, 'updateProjectActivity'])->name('project.activity.update');
     Route::get('/delete-project-activity/{id}', [AntrianController::class, 'deleteProjectActivity'])->name('project.activity.delete');
+
+    // Jadwal (Timeline Request) Routes
+    Route::post('/update-jadwal/{id}', [AntrianController::class, 'updateJadwal'])->name('jadwal.update');
+    Route::get('/delete-jadwal/{id}', [AntrianController::class, 'deleteJadwal'])->name('jadwal.delete');
 
     // Follow-up Meeting Route
     Route::get('/create-followup-meeting/{parent_meeting_result_id}', [AntrianController::class, 'createFollowupMeeting'])->name('meeting.followup');
