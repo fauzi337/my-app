@@ -94,7 +94,7 @@
                             <i class="bi bi-activity text-indigo-500"></i> Daftar Project Activity
                         </h3>
                         <span class="text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg">
-                            Total: {{ $projectActivities->count() }} Kegiatan
+                            Total: {{ $projectActivities->total() }} Kegiatan
                         </span>
                     </div>
 
@@ -103,7 +103,7 @@
                             <thead class="bg-slate-50 text-slate-600">
                                 <tr>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Aksi</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Task</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider min-w-[280px]">Task</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Site / PIC</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Tanggal Masuk</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Deadline</th>
@@ -134,8 +134,8 @@
                                                 </a>
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3">
-                                            <div class="font-semibold text-slate-800 leading-relaxed max-w-[280px] break-words">{{ $pa->task }}</div>
+                                        <td class="px-4 py-3 text-sm text-slate-700 font-medium min-w-[280px] break-words" title="{{ $pa->task }}">
+                                            {{ $pa->task }}
                                         </td>
                                         <td class="px-4 py-3 space-y-1">
                                             <div>
@@ -203,6 +203,20 @@
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-100">
+                        <div class="text-xs text-slate-500 font-medium">
+                            @if($projectActivities->total() > 0)
+                                Menampilkan {{ $projectActivities->firstItem() }}-{{ $projectActivities->lastItem() }} dari {{ $projectActivities->total() }} data
+                            @else
+                                Tidak ada data
+                            @endif
+                        </div>
+                        @if($projectActivities->hasPages())
+                            <div class="premium-pagination">
+                                {{ $projectActivities->links('pagination::bootstrap-5') }}
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
