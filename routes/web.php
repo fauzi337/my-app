@@ -29,12 +29,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/upload-pdf/{id}', [AntrianController::class, 'uploadPdf'])->name('upload.pdf');
     Route::post('/save-dashboard-agenda', [AntrianController::class, 'postAgenda'])->name('dashboard.agendas');
     Route::post('/update-statusagenda/{id}', [AntrianController::class, 'updateAgenda'])->name('update.agenda');
+    Route::delete('/delete-agenda/{id}', [AntrianController::class, 'deleteAgenda'])->name('agenda.delete');
     Route::post('/save-dailyreport', [AntrianController::class, 'saveDaily'])->name('save.daily');
     Route::post('/save-weeklyreport', [AntrianController::class, 'saveWeekly'])->name('save.weekly');
 
     // Meeting Management & Project Tracker Routes
     Route::post('/save-meeting-notes/{meeting_result_id}', [AntrianController::class, 'saveMeetingNotes'])->name('meeting.notes.save');
     Route::post('/meeting-result/{meeting_result_id}/upload-audio', [AntrianController::class, 'uploadAudio'])->name('meeting.upload-audio');
+    Route::post('/meeting-result/{meeting_result_id}/extract-existing-audio', [AntrianController::class, 'extractExistingAudio'])->name('meeting.extract-existing-audio');
     Route::get('/meeting-detail/{meeting_result_id}', [AntrianController::class, 'getMeetingDetail'])->name('meeting.detail');
     Route::get('/agenda-timeline/{id}', [AntrianController::class, 'getAgendaTimeline'])->name('agenda.timeline');
     Route::get('/project-tracker', [AntrianController::class, 'getProjectTracker'])->name('project.tracker');

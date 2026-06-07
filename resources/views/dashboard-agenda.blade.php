@@ -237,6 +237,17 @@
                                             title="Lihat Timeline Rapat">
                                             <i class="bi bi-clock-history"></i>
                                         </button>
+                                        @if(auth()->user() && auth()->user()->pegawai_id !== null && (int)auth()->user()->pegawai_id === 0)
+                                            <form action="{{ route('agenda.delete', $item->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Apakah Anda yakin ingin menghapus agenda ini beserta semua data terkait?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" 
+                                                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:text-white hover:bg-red-600 border border-red-200 hover:border-red-600 transition-all duration-200 shadow-sm"
+                                                    title="Hapus Agenda">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-xs font-semibold text-gray-500 font-mono w-24">{{ $item->kd_list }}</td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 w-28">{{ $item->namasite }}</td>
@@ -456,118 +467,193 @@
                             };
 
                             this.mediaRecorder.onstop = () => {
-                                this.audioBlob = new Blob(chunks, { type: 'audio/webm' });
-                                this.audioUrl = URL.createObjectURL(this.audioBlob);
-                                this.showOptions = true;
-                                
-                                // Stop all audio tracks
-                                stream.getTracks().forEach(track => track.stop());
-                            };
+                                 const actualMimeType = this.mediaRecorder.mimeType || 'audio/webm';
+                                 this.audioBlob = new Blob(chunks, { type: actualMimeType });
+                                 this.audioUrl = URL.createObjectURL(this.audioBlob);
+                                 this.showOptions = true;
+                                 
+                                 // Stop all audio tracks
+                                 stream.getTracks().forEach(track => track.stop());
+                             };
 
-                            // Setup Speech Recognition
-                            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                            if (SpeechRecognition) {
-                                this.recognition = new SpeechRecognition();
-                                this.recognition.continuous = true;
-                                this.recognition.interimResults = true;
-                                this.recognition.lang = 'id-ID';
+                             // Setup Speech Recognition
+                             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                             if (SpeechRecognition) {
+                                 this.recognition = new SpeechRecognition();
+                                 this.recognition.continuous = true;
+                                 this.recognition.interimResults = true;
+                                 this.recognition.lang = 'id-ID';
 
-                                this.recognition.onresult = (event) => {
-                                    let interimTranscript = '';
-                                    let finalTranscript = '';
-                                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                                        if (event.results[i].isFinal) {
-                                            finalTranscript += event.results[i][0].transcript;
-                                        } else {
-                                            interimTranscript += event.results[i][0].transcript;
-                                        }
-                                    }
-                                    if (finalTranscript) {
-                                        this.recordedText += (this.recordedText ? ' ' : '') + finalTranscript;
-                                    }
-                                };
+                                 this.recognition.onresult = (event) => {
+                                     let interimTranscript = '';
+                                     let finalTranscript = '';
+                                     for (let i = event.resultIndex; i < event.results.length; ++i) {
+                                         if (event.results[i].isFinal) {
+                                             finalTranscript += event.results[i][0].transcript;
+                                         } else {
+                                             interimTranscript += event.results[i][0].transcript;
+                                         }
+                                     }
+                                     if (finalTranscript) {
+                                         this.recordedText += (this.recordedText ? ' ' : '') + finalTranscript;
+                                     }
+                                 };
 
-                                this.recognition.onerror = (e) => {
-                                    console.error('Speech recognition error', e);
-                                };
+                                 this.recognition.onerror = (e) => {
+                                     console.error('Speech recognition error', e);
+                                 };
 
-                                this.recognition.start();
-                            } else {
-                                console.warn('Speech recognition not supported in this browser.');
-                            }
+                                 this.recognition.start();
+                             } else {
+                                 console.warn('Speech recognition not supported in this browser.');
+                             }
 
-                            this.mediaRecorder.start();
-                            this.isRecording = true;
-                            this.recordingSeconds = 0;
-                            this.recordingInterval = setInterval(() => {
-                                this.recordingSeconds++;
-                            }, 1000);
+                             this.mediaRecorder.start();
+                             this.isRecording = true;
+                             this.recordingSeconds = 0;
+                             this.recordingInterval = setInterval(() => {
+                                 this.recordingSeconds++;
+                             }, 1000);
 
-                        } catch (err) {
-                            console.error('Failed to get mic access', err);
-                            this.errorMessage = 'Gagal mengakses mikrofon. Pastikan izin diberikan.';
-                        }
-                    },
+                         } catch (err) {
+                             console.error('Failed to get mic access', err);
+                             this.errorMessage = 'Gagal mengakses mikrofon. Pastikan izin diberikan.';
+                         }
+                     },
 
-                    stopRecording() {
-                        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-                            this.mediaRecorder.stop();
-                        }
-                        if (this.recognition) {
-                            this.recognition.stop();
-                        }
-                        clearInterval(this.recordingInterval);
-                        this.isRecording = false;
-                    },
+                     stopRecording() {
+                         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                             this.mediaRecorder.stop();
+                         }
+                         if (this.recognition) {
+                             this.recognition.stop();
+                         }
+                         clearInterval(this.recordingInterval);
+                         this.isRecording = false;
+                     },
 
-                    async saveRecording(extract) {
-                        if (!this.audioBlob) return;
-                        this.isUploading = true;
-                        this.errorMessage = '';
+                     async saveRecording(extract) {
+                         if (!this.audioBlob) return;
+                         this.isUploading = true;
+                         this.errorMessage = '';
 
-                        const formData = new FormData();
-                        formData.append('audio_file', this.audioBlob, 'recording.webm');
-                        
-                        // Get CSRF Token
-                        const token = document.querySelector('input[name=\'_token\']').value;
-                        
-                        try {
-                            const res = await fetch(`/meeting-result/${this.meetingResultId}/upload-audio`, {
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRF-TOKEN': token
-                                },
-                                body: formData
-                            });
+                         const formData = new FormData();
+                         const fileExt = this.audioBlob.type.includes('ogg') ? 'ogg' : 'webm';
+                         formData.append('audio_file', this.audioBlob, `recording.${fileExt}`);
+                         formData.append('mime_type', this.audioBlob.type);
+                         if (extract) {
+                             formData.append('extract', '1');
+                         }
+                         
+                         // Get CSRF Token
+                         const token = document.querySelector('input[name=\'_token\']').value;
+                         
+                         try {
+                             const res = await fetch(`/meeting-result/${this.meetingResultId}/upload-audio`, {
+                                 method: 'POST',
+                                 headers: {
+                                     'X-CSRF-TOKEN': token
+                                 },
+                                 body: formData
+                             });
 
-                            const data = await res.json();
-                            if (data.success) {
-                                this.audioPath = data.audio_path;
+                             const data = await res.json();
+                             if (data.success) {
+                                 this.audioPath = data.audio_path;
 
-                                if (extract) {
-                                    const textToInsert = this.recordedText.trim();
-                                    if (textToInsert) {
-                                        if (this.notulenText.trim()) {
-                                            this.notulenText += '\n\n' + textToInsert;
-                                        } else {
-                                            this.notulenText = textToInsert;
-                                        }
-                                    } else {
-                                        alert('Audio berhasil disimpan, namun tidak ada transkripsi yang terdeteksi.');
-                                    }
-                                }
-                                alert('Rekaman audio berhasil disimpan!');
-                                this.showOptions = false;
-                            } else {
-                                this.errorMessage = data.message || 'Gagal menyimpan rekaman.';
-                            }
-                        } catch (err) {
-                            console.error('Upload error', err);
-                            this.errorMessage = 'Terjadi kesalahan koneksi saat mengupload.';
-                        } finally {
-                            this.isUploading = false;
-                        }
-                    },
+                                 if (extract) {
+                                     if (data.extraction_error) {
+                                         alert(data.extraction_error);
+                                     } else {
+                                         const textToInsert = data.transcription ? data.transcription.trim() : '';
+                                         if (textToInsert) {
+                                             if (this.notulenText.trim()) {
+                                                 this.notulenText += '\n\n' + textToInsert;
+                                             } else {
+                                                 this.notulenText = textToInsert;
+                                             }
+                                         }
+
+                                         if (data.action_items && data.action_items.length > 0) {
+                                             data.action_items.forEach(item => {
+                                                 this.actionItems.push({
+                                                     description: item.description,
+                                                     category_id: item.category_id,
+                                                     unit_id: this.unitId,
+                                                     pic_person_id: '',
+                                                     priority_id: item.priority_id,
+                                                     target_date: item.target_date
+                                                 });
+                                             });
+                                         }
+                                         alert('Rekaman berhasil disimpan, transkrip dan action items berhasil diekstrak!');
+                                     }
+                                 } else {
+                                     alert('Rekaman audio berhasil disimpan!');
+                                 }
+                                 this.showOptions = false;
+                             } else {
+                                 this.errorMessage = data.message || 'Gagal menyimpan rekaman.';
+                             }
+                         } catch (err) {
+                             console.error('Upload error', err);
+                             this.errorMessage = 'Terjadi kesalahan koneksi saat mengupload.';
+                         } finally {
+                             this.isUploading = false;
+                         }
+                     },
+
+                     async extractExistingAudio() {
+                         if (!this.audioPath) return;
+                         this.isUploading = true;
+                         this.errorMessage = '';
+
+                         // Get CSRF Token
+                         const token = document.querySelector('input[name=\'_token\']').value;
+
+                         try {
+                             const res = await fetch(`/meeting-result/${this.meetingResultId}/extract-existing-audio`, {
+                                 method: 'POST',
+                                 headers: {
+                                     'X-CSRF-TOKEN': token,
+                                     'Content-Type': 'application/json'
+                                 }
+                             });
+
+                             const data = await res.json();
+                             if (data.success) {
+                                 const textToInsert = data.transcription ? data.transcription.trim() : '';
+                                 if (textToInsert) {
+                                     if (this.notulenText.trim()) {
+                                         this.notulenText += '\n\n' + textToInsert;
+                                     } else {
+                                         this.notulenText = textToInsert;
+                                     }
+                                 }
+
+                                 if (data.action_items && data.action_items.length > 0) {
+                                     data.action_items.forEach(item => {
+                                         this.actionItems.push({
+                                             description: item.description,
+                                             category_id: item.category_id,
+                                             unit_id: this.unitId,
+                                             pic_person_id: '',
+                                             priority_id: item.priority_id,
+                                             target_date: item.target_date
+                                         });
+                                     });
+                                 }
+                                 alert('Audio berhasil diekstrak dengan Asisten!');
+                             } else {
+                                 alert(data.message || 'Gagal mengekstrak audio.');
+                             }
+                         } catch (err) {
+                             console.error('Extraction error', err);
+                             alert('Terjadi kesalahan koneksi saat mengekstrak.');
+                         } finally {
+                             this.isUploading = false;
+                         }
+                     },
 
                     addActionItem() {
                         this.actionItems.push({
@@ -667,7 +753,13 @@
                                          <i class="bi bi-file-earmark-music text-orange-500 text-sm"></i>
                                          <span>Rekaman Audio Rapat:</span>
                                      </div>
-                                     <audio :src="'/' + audioPath" controls class="h-8 max-w-xs scale-95 origin-right"></audio>
+                                     <div class="flex items-center gap-2">
+                                         <audio :src="'/' + audioPath" controls class="h-8 max-w-xs scale-95 origin-right"></audio>
+                                         <button type="button" @click="extractExistingAudio()" :disabled="isUploading" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded transition-colors shadow-sm">
+                                             <span x-show="isUploading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                             <i class="bi bi-magic"></i> Extract Audio 
+                                         </button>
+                                     </div>
                                  </div>
                              </template>
 

@@ -809,6 +809,24 @@ class AntrianController extends Controller
          return redirect()->back()->with('success', 'Status berhasil diupdate.');
      }
 
+     public function deleteAgenda($id)
+     {
+         if (Auth::user()->pegawai_id === null || (int) Auth::user()->pegawai_id !== 0) {
+             abort(403, 'Unauthorized action.');
+         }
+
+         $agenda = AgendaMeeting::findOrFail($id);
+         $agenda->delete();
+
+         AuditLog::create([
+             'user_id' => Auth::id(),
+             'activity' => 'Agenda Meeting dihapus',
+             'details' => 'Menghapus agenda meeting ID: ' . $id
+         ]);
+
+         return redirect()->back()->with('success', 'Agenda Meeting berhasil dihapus!');
+     }
+
      public function saveMeetingNotes(Request $request, $meeting_result_id)
      {
          $today = Carbon::now();
@@ -1438,7 +1456,7 @@ class AntrianController extends Controller
         $projectActivities = ProjectActivity::with(['prioritas', 'site', 'pic'])
             ->where('statusenabled', true)
             ->orderBy('tgl_deadline', 'asc')
-            ->get();
+            ->paginate(3);
 
         $priorities = Prioritas::where('statusenabled', true)->get();
         $sites = Site::where('statusenabled', true)->get();
@@ -1625,12 +1643,18 @@ class AntrianController extends Controller
     {
         $request->validate([
             'audio_file' => 'required|file',
+            'extract' => 'nullable|string', // '1' or 'true'
+            'mime_type' => 'nullable|string',
         ]);
 
         $meetingResult = MeetingResult::findOrFail($meeting_result_id);
 
         if ($request->hasFile('audio_file')) {
             $file = $request->file('audio_file');
+            
+            // Get mime type before moving the file to prevent temporary file not found exception
+            $mimeType = $request->input('mime_type') ?: ($file->getClientMimeType() ?: ($file->getMimeType() ?: 'audio/webm'));
+            
             $filename = 'audio_' . $meetingResult->id . '_' . time() . '.webm';
             $file->move('meeting_audios', $filename);
 
@@ -1644,9 +1668,67 @@ class AntrianController extends Controller
             $meetingResult->audio_path = 'meeting_audios/' . $filename;
             $meetingResult->save();
 
+            $transcription = '';
+            $extractedActionItems = [];
+
+            if ($request->input('extract') === '1' || $request->input('extract') === 'true') {
+                try {
+                    $filePath = public_path($meetingResult->audio_path);
+                    
+                    $geminiData = \App\Services\GeminiService::extractFromAudio($filePath, $mimeType);
+                    
+                    $transcription = $geminiData['transcription'] ?? '';
+                    $rawActionItems = $geminiData['action_items'] ?? [];
+
+                    // Fetch all categories and priorities to perform database-agnostic matching in PHP
+                    $allPriorities = \App\Models\MasterPriority::where('statusenabled', true)->get();
+                    $allCategories = \App\Models\MasterActionCategory::where('statusenabled', true)->get();
+
+                    foreach ($rawActionItems as $item) {
+                        $desc = $item['description'] ?? '';
+                        if (empty($desc)) continue;
+
+                        $priorityName = $item['priority'] ?? 'Low';
+                        $priorityObj = $allPriorities->first(function ($p) use ($priorityName) {
+                            return str_contains(strtolower($p->name), strtolower(trim($priorityName))) || 
+                                   str_contains(strtolower(trim($priorityName)), strtolower($p->name));
+                        }) ?? $allPriorities->first();
+
+                        $categoryName = $item['category'] ?? 'Non Develop';
+                        $categoryObj = $allCategories->first(function ($c) use ($categoryName) {
+                            return str_contains(strtolower($c->name), strtolower(trim($categoryName))) || 
+                                   str_contains(strtolower(trim($categoryName)), strtolower($c->name));
+                        }) ?? $allCategories->first();
+
+                        $targetDate = $item['target_date'] ?? null;
+                        // Validate format (YYYY-MM-DD) or default to today's date
+                        if (!$targetDate || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $targetDate)) {
+                            $targetDate = date('Y-m-d');
+                        }
+
+                        $extractedActionItems[] = [
+                            'description' => $desc,
+                            'priority_id' => $priorityObj ? $priorityObj->id : '',
+                            'category_id' => $categoryObj ? $categoryObj->id : '',
+                            'target_date' => $targetDate,
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Gemini extraction error: ' . $e->getMessage());
+                    // We still return success: true for saving the audio file, but with an extraction error message
+                    return response()->json([
+                        'success' => true,
+                        'audio_path' => $meetingResult->audio_path,
+                        'extraction_error' => 'Gagal mengekstrak audio: ' . $e->getMessage()
+                    ]);
+                }
+            }
+
             return response()->json([
                 'success' => true,
-                'audio_path' => $meetingResult->audio_path
+                'audio_path' => $meetingResult->audio_path,
+                'transcription' => $transcription,
+                'action_items' => $extractedActionItems
             ]);
         }
 
@@ -1654,6 +1736,89 @@ class AntrianController extends Controller
             'success' => false,
             'message' => 'Gagal mengupload file audio.'
         ], 400);
+    }
+
+    public function extractExistingAudio($meeting_result_id)
+    {
+        $meetingResult = MeetingResult::findOrFail($meeting_result_id);
+        
+        if (!$meetingResult->audio_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada file rekaman audio yang tersimpan untuk rapat ini.'
+            ], 400);
+        }
+
+        $filePath = public_path($meetingResult->audio_path);
+        if (!file_exists($filePath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File rekaman audio tidak ditemukan di server.'
+            ], 400);
+        }
+
+        // Attempt to determine the mime type from the saved file extension
+        $extension = pathinfo($filePath, PATHINFO_EXTENSION);
+        $mimeType = 'audio/webm'; // Default fallback
+        if ($extension === 'ogg') {
+            $mimeType = 'audio/ogg';
+        } elseif ($extension === 'mp3') {
+            $mimeType = 'audio/mp3';
+        } elseif ($extension === 'wav') {
+            $mimeType = 'audio/wav';
+        }
+
+        try {
+            $geminiData = \App\Services\GeminiService::extractFromAudio($filePath, $mimeType);
+            
+            $transcription = $geminiData['transcription'] ?? '';
+            $rawActionItems = $geminiData['action_items'] ?? [];
+
+            $allPriorities = \App\Models\MasterPriority::where('statusenabled', true)->get();
+            $allCategories = \App\Models\MasterActionCategory::where('statusenabled', true)->get();
+            $extractedActionItems = [];
+
+            foreach ($rawActionItems as $item) {
+                $desc = $item['description'] ?? '';
+                if (empty($desc)) continue;
+
+                $priorityName = $item['priority'] ?? 'Low';
+                $priorityObj = $allPriorities->first(function ($p) use ($priorityName) {
+                    return str_contains(strtolower($p->name), strtolower(trim($priorityName))) || 
+                           str_contains(strtolower(trim($priorityName)), strtolower($p->name));
+                }) ?? $allPriorities->first();
+
+                $categoryName = $item['category'] ?? 'Non Develop';
+                $categoryObj = $allCategories->first(function ($c) use ($categoryName) {
+                    return str_contains(strtolower($c->name), strtolower(trim($categoryName))) || 
+                           str_contains(strtolower(trim($categoryName)), strtolower($c->name));
+                }) ?? $allCategories->first();
+
+                $targetDate = $item['target_date'] ?? null;
+                if (!$targetDate || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $targetDate)) {
+                    $targetDate = date('Y-m-d');
+                }
+
+                $extractedActionItems[] = [
+                    'description' => $desc,
+                    'priority_id' => $priorityObj ? $priorityObj->id : '',
+                    'category_id' => $categoryObj ? $categoryObj->id : '',
+                    'target_date' => $targetDate,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'transcription' => $transcription,
+                'action_items' => $extractedActionItems
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Gemini extraction error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengekstrak audio: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
 }
