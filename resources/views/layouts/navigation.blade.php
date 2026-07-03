@@ -16,15 +16,24 @@
                         menuOpen: false,
                         search: '',
                         menuItems: [
+                            { label: 'Marketing Dashboard', href: '{{ route('marketing.dashboard') }}' },
+                            @if(in_array(auth()->user()->role, ['admin', 'manager', 'developer', 'pic_request']))
                             { label: 'Timeline Request', href: '{{ route('dashboard.jadwal') }}' },
-                            { label: 'Agenda', href: '{{ route('dashboard.agenda') }}' },
+                            @endif
+                            { label: 'Agenda & Meeting', href: '{{ route('dashboard.agenda') }}' },
+                            @if(in_array(auth()->user()->role, ['admin', 'manager', 'developer', 'pic_request']))
                             { label: 'Project Tracker', href: '{{ route('project.tracker') }}' },
                             { label: 'Project Activity', href: '{{ route('project.activity') }}' },
-                            { label: 'Developer', href: '{{ route('dashboard.dev') }}' },
-                            { label: 'PIC Request', href: '{{ route('dashboard.picreq') }}' },
+                            @if(in_array(auth()->user()->role, ['admin', 'manager']))
+                            { label: 'Master WBS', href: '{{ route('wbs.master') }}' },
+                            { label: 'Master Modul', href: '{{ route('modul.master') }}' },
+                            @endif
+                            { label: 'Developer Dashboard', href: '{{ route('dashboard.dev') }}' },
+                            { label: 'PIC Request Dashboard', href: '{{ route('dashboard.picreq') }}' },
                             { label: 'Request Server', href: '{{ route('dashboard.reqserver') }}' },
                             { label: 'Daily Report', href: '{{ route('dashboard.daily') }}' },
                             { label: 'Weekly Report', href: '{{ route('dashboard.weekly') }}' }
+                            @endif
                         ]
                     }"
                     class="relative">
@@ -143,15 +152,23 @@
              x-data="{
                 mobileSearch: '',
                 mobileMenuItems: [
+                    { label: 'Marketing Dashboard', href: '{{ route('marketing.dashboard') }}' },
+                    @if(in_array(auth()->user()->role, ['admin', 'manager', 'developer', 'pic_request']))
                     { label: 'Timeline Request', href: '{{ route('dashboard.jadwal') }}' },
-                    { label: 'Agenda Pihak Luar', href: '{{ route('dashboard.agenda') }}' },
+                    @endif
+                    { label: 'Agenda & Meeting', href: '{{ route('dashboard.agenda') }}' },
+                    @if(in_array(auth()->user()->role, ['admin', 'manager', 'developer', 'pic_request']))
                     { label: 'Project Tracker', href: '{{ route('project.tracker') }}' },
                     { label: 'Project Activity', href: '{{ route('project.activity') }}' },
-                    { label: 'Developer', href: '{{ route('dashboard.dev') }}' },
-                    { label: 'PIC Request', href: '{{ route('dashboard.picreq') }}' },
+                    @if(in_array(auth()->user()->role, ['admin', 'manager']))
+                    { label: 'Master WBS', href: '{{ route('wbs.master') }}' },
+                    @endif
+                    { label: 'Developer Dashboard', href: '{{ route('dashboard.dev') }}' },
+                    { label: 'PIC Request Dashboard', href: '{{ route('dashboard.picreq') }}' },
                     { label: 'Request Server', href: '{{ route('dashboard.reqserver') }}' },
                     { label: 'Daily Report', href: '{{ route('dashboard.daily') }}' },
                     { label: 'Weekly Report', href: '{{ route('dashboard.weekly') }}' }
+                    @endif
                 ]
              }">
             <div class="mb-2">

@@ -31,6 +31,9 @@ use App\Models\ActionItemProgress;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Models\ProjectActivity;
+use App\Models\Won;
+use App\Models\WonDetail;
+use App\Models\ProjectWbs;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
@@ -89,7 +92,10 @@ class AntrianController extends Controller
     {
         $todayMonth = Carbon::now()->startOfMonth(); // Awal bulan ini
         // dd($todayMonth);
-        $daftarJadwal = Jadwal::from('jadwal_t as jt')
+        
+        $selectedJenisRequest = request('jenis_request', 'Golive');
+        
+        $query = Jadwal::from('jadwal_t as jt')
                             ->join('prioritas_m as pr','pr.id','=','jt.prioritas_id')
                             ->join('jenistask_m as js','js.id','=','jt.jenistask_id')
                             ->join('timeline_m as tm','tm.id','=','jt.timeline_id')
@@ -97,8 +103,13 @@ class AntrianController extends Controller
                             ->join('status_m as st','st.id','=','jt.developer_status_id')
                             ->leftJoin('pegawai_m as pg_dev','pg_dev.id','=','jt.picdeveloper_id')
                             ->where('jt.developer_status_id',1)
-                            ->where('jt.statusenabled',true)
-                            ->select('jt.id', 'jt.prioritas_id', 'jt.jenistask_id', 'jt.site_id', 'jt.timeline_id', 'jt.picrequest_id', 'jt.picdeveloper_id', 'pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','st.status as devstatus','pg_dev.namapegawai as pic_developer',
+                            ->where('jt.statusenabled',true);
+                            
+        if ($selectedJenisRequest !== 'all') {
+            $query->where('jt.jenis_request', $selectedJenisRequest);
+        }
+        
+        $daftarJadwal = $query->select('jt.id', 'jt.prioritas_id', 'jt.jenistask_id', 'jt.site_id', 'jt.timeline_id', 'jt.picrequest_id', 'jt.picdeveloper_id', 'pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.jenis_request','jt.tgl_deadline','st.status as devstatus','pg_dev.namapegawai as pic_developer',
                             DB::raw("CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"))
                             ->orderBy('si.namasite')
                             ->orderBy('jt.created_at', 'desc')
@@ -141,7 +152,7 @@ class AntrianController extends Controller
                             ->select('pg.id','pg.namalengkap')
                             ->get();
 
-        return view('dashboard-jadwal', compact('daftarJadwal','pegawai','prioritas','jenisTask','site','timeline','picReq','statusDev','statusServer','statusPicReq','statusFinal','cekLogin'));
+        return view('dashboard-jadwal', compact('daftarJadwal','pegawai','prioritas','jenisTask','site','timeline','picReq','statusDev','statusServer','statusPicReq','statusFinal','cekLogin', 'selectedJenisRequest'));
       
     }
 
@@ -166,7 +177,8 @@ class AntrianController extends Controller
         $validated = $request->validate([
             'task_masuk' => 'required|date',
             'task_deadline' => 'required|date|after_or_equal:task_masuk',
-            'task' => 'required|string'
+            'task' => 'required|string',
+            'jenis_request' => 'nullable|string|in:Pra-Golive,Golive'
         ],[
             'task_masuk.required' => 'Silahkan isi Task Masuk terlebih dahulu !',
             'task.required' => 'Silahkan isi Task terlebih dahulu !',
@@ -190,6 +202,7 @@ class AntrianController extends Controller
             'tgl_masuk' => $validated['task_masuk'],
             'tgl_deadline' => $request->task_deadline,
             'task' => $validated['task'],
+            'jenis_request' => $request->jenis_request ?? 'Golive',
             'picrequest_id' => $request->picrequest,
             'picdeveloper_id' => $request->pegawai,
             'tgl_selesai' => $request->tgl_selesai ?? null,
@@ -1159,6 +1172,27 @@ class AntrianController extends Controller
         $unfinishedPA = $projectActivities->where('status', '<>', 'Done');
         $unfinishedTR = $timelineRequests->where('final_status_id', '<>', 19);
 
+        $userPegawaiId = Auth::user()->pegawai_id;
+        $userRole = Auth::user()->role;
+
+        if (in_array($userRole, ['admin', 'manager'])) {
+            $wonProjects = Won::with(['site', 'picKoordinator', 'picImplementator', 'details.picDeveloper', 'details.checklists', 'wbs'])
+                ->where('site_id', $selectedSiteId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            $wonProjects = Won::with(['site', 'picKoordinator', 'picImplementator', 'details.picDeveloper', 'details.checklists', 'wbs'])
+                ->where('site_id', $selectedSiteId)
+                ->where('pic_koordinator_id', $userPegawaiId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
+
+        $programmers = Pegawai::where('statusenabled', true)
+            ->where('jenispegawai', 'Implementator')
+            ->orderBy('namapegawai')
+            ->get();
+
         return view('project-tracker', compact(
             'sites',
             'selectedSiteId',
@@ -1168,8 +1202,87 @@ class AntrianController extends Controller
             'donePercentage',
             'undonePercentage',
             'unfinishedPA',
-            'unfinishedTR'
+            'unfinishedTR',
+            'wonProjects',
+            'programmers'
         ));
+    }
+
+    public function delegateWonModule(Request $request, $detailId)
+    {
+        $validated = $request->validate([
+            'pic_developer_id' => 'required|exists:pegawai_m,id',
+        ]);
+
+        $detail = WonDetail::with('won')->findOrFail($detailId);
+
+        // Check permission: must be admin/manager OR the assigned pic_koordinator
+        $userPegawaiId = Auth::user()->pegawai_id;
+        $userRole = Auth::user()->role;
+        if (!in_array($userRole, ['admin', 'manager']) && $detail->won->pic_koordinator_id != $userPegawaiId) {
+            return redirect()->back()->withErrors(['error' => 'Anda tidak memiliki hak untuk mendelegasikan modul proyek ini.']);
+        }
+
+        $detail->update([
+            'pic_developer_id' => $validated['pic_developer_id'],
+            'status' => $detail->status === 'To Do' && $detail->progress == 0 ? 'On Progress' : $detail->status, // advance status if just assigned
+        ]);
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Delegate Won Project Module',
+            'details' => "Mendelegasikan modul {$detail->modul_name} pada Won Project ID {$detail->won_id} ke Pegawai ID {$validated['pic_developer_id']}",
+        ]);
+
+        return redirect()->back()->with('success', 'Modul berhasil didelegasikan!');
+    }
+
+    public function updateWonModuleProgress(Request $request, $detailId)
+    {
+        $validated = $request->validate([
+            'progress' => 'required|integer|min:0|max:100',
+            'status' => 'required|in:To Do,On Progress,Done',
+            'keterangan' => 'nullable|string',
+        ]);
+
+        $detail = WonDetail::with('won')->findOrFail($detailId);
+
+        // Check permission: must be admin/manager OR the assigned pic_koordinator OR the assigned developer
+        $userPegawaiId = Auth::user()->pegawai_id;
+        $userRole = Auth::user()->role;
+        
+        $isKoordinator = ($detail->won->pic_koordinator_id == $userPegawaiId);
+        $isDeveloper = ($detail->pic_developer_id == $userPegawaiId);
+
+        if (!in_array($userRole, ['admin', 'manager']) && !$isKoordinator && !$isDeveloper) {
+            return redirect()->back()->withErrors(['error' => 'Anda tidak memiliki hak untuk mengubah progres modul proyek ini.']);
+        }
+
+        $detail->update([
+            'progress' => $validated['progress'],
+            'status' => $validated['status'],
+            'keterangan' => $validated['keterangan'] ?? null,
+        ]);
+
+        // If all details of this Won Project are 100% / Done, we can optionally mark the Won Project status as Completed
+        $allWonDetails = WonDetail::where('won_id', $detail->won_id)->get();
+        $isAllDone = $allWonDetails->every(function ($item) {
+            return $item->status === 'Done' && $item->progress === 100;
+        });
+
+        if ($isAllDone) {
+            $detail->won->update(['status' => 'Completed']);
+        } else {
+            $detail->won->update(['status' => 'In_Progress']);
+        }
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Update Won Project Module Progress',
+            'details' => "Mengubah progres modul {$detail->modul_name} menjadi {$validated['progress']}% ({$validated['status']})",
+        ]);
+
+        return redirect()->back()->with('success', 'Progres modul berhasil diperbarui!');
     }
 
      public function saveProject(Request $request)
@@ -1451,7 +1564,7 @@ class AntrianController extends Controller
         return redirect()->back()->with('success', 'Weekly Report berhasil disimpan.');
     }
 
-    public function getProjectActivity()
+    public function getProjectActivity(Request $request)
     {
         $projectActivities = ProjectActivity::with(['prioritas', 'site', 'pic'])
             ->where('statusenabled', true)
@@ -1462,7 +1575,231 @@ class AntrianController extends Controller
         $sites = Site::where('statusenabled', true)->get();
         $pics = Pegawai::where('statusenabled', true)->get();
 
-        return view('project-activity', compact('projectActivities', 'priorities', 'sites', 'pics'));
+        $wons = Won::with('site')->orderBy('created_at', 'desc')->get();
+        $selectedWonId = $request->input('won_id') ?: ($wons->first()?->id ?? null);
+
+        $projectWbs = [];
+        if ($selectedWonId) {
+            $projectWbs = ProjectWbs::with('pic')
+                ->where('won_id', $selectedWonId)
+                ->orderBy('order_num', 'asc')
+                ->get();
+        }
+
+        $programmers = Pegawai::where('statusenabled', true)
+            ->orderBy('namapegawai')
+            ->get();
+
+        return view('project-activity', compact(
+            'projectActivities', 
+            'priorities', 
+            'sites', 
+            'pics',
+            'wons',
+            'selectedWonId',
+            'projectWbs',
+            'programmers'
+        ));
+    }
+
+    public function updateProjectWbs(Request $request, $wbsId)
+    {
+        $validated = $request->validate([
+            'jmt_pic_id' => 'nullable|exists:pegawai_m,id',
+            'client_pic' => 'nullable|string|max:255',
+            'predecessor_id' => 'nullable|exists:project_wbs,id',
+            'start_date' => 'nullable|date',
+            'due_date' => 'nullable|date',
+            'duration' => 'nullable|integer|min:0',
+            'status' => 'required|in:NOT STARTED,IN PROGRESS,DONE,NEED REVIEW,DELAYED',
+            'finish_date' => 'nullable|date',
+            'keterangan' => 'nullable|string',
+            'link_file' => 'nullable|string|max:550',
+            'file_upload' => 'nullable|file|max:10240',
+        ]);
+
+        $wbs = ProjectWbs::findOrFail($wbsId);
+
+        $duration = $request->input('duration') !== null ? (int)$request->input('duration') : null;
+        $startDate = $request->input('start_date') ? \Carbon\Carbon::parse($request->input('start_date')) : null;
+        $dueDate = $request->input('due_date') ? \Carbon\Carbon::parse($request->input('due_date')) : null;
+        $predecessorId = $request->input('predecessor_id');
+
+        // Handle File Upload
+        $linkFile = $request->input('link_file');
+        if ($request->hasFile('file_upload')) {
+            $path = $request->file('file_upload')->store('wbs_files', 'public');
+            $linkFile = \Illuminate\Support\Facades\Storage::url($path);
+        }
+
+        // Predecessor date logic: start_date is predecessor's due_date + 1 day
+        if ($predecessorId) {
+            $pred = ProjectWbs::find($predecessorId);
+            if ($pred && $pred->due_date) {
+                $startDate = \Carbon\Carbon::parse($pred->due_date)->addDay();
+            }
+        }
+
+        // Calculate missing date/duration
+        if ($startDate) {
+            if ($duration !== null && $duration > 0) {
+                $dueDate = $startDate->copy()->addDays($duration - 1);
+            } elseif ($dueDate) {
+                $diff = $dueDate->timestamp - $startDate->timestamp;
+                $duration = (int)round($diff / (60 * 60 * 24)) + 1;
+                if ($duration < 0) $duration = 0;
+            }
+        }
+
+        $status = $validated['status'];
+        $finishDate = $validated['finish_date'] ? \Carbon\Carbon::parse($validated['finish_date']) : null;
+        if ($finishDate) {
+            $status = 'DONE';
+        }
+
+        $wbs->update([
+            'jmt_pic_id' => $validated['jmt_pic_id'],
+            'client_pic' => $validated['client_pic'],
+            'predecessor_id' => $predecessorId,
+            'start_date' => $startDate,
+            'due_date' => $dueDate,
+            'duration' => $duration,
+            'status' => $status,
+            'finish_date' => $finishDate,
+            'keterangan' => $validated['keterangan'],
+            'link_file' => $linkFile,
+        ]);
+
+        // Propagate updates to all downstream successors
+        $this->updateWbsSuccessorDates($wbs);
+
+        // Audit Log
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Update Project WBS Row',
+            'details' => "Memperbarui baris WBS: {$wbs->wbs_code} - {$wbs->detail_task} untuk Won ID: {$wbs->won_id}",
+        ]);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'WBS row updated successfully!',
+                'duration' => $duration,
+                'start_date' => $startDate ? $startDate->format('Y-m-d') : null,
+                'due_date' => $dueDate ? $dueDate->format('Y-m-d') : null,
+                'link_file' => $linkFile,
+            ]);
+        }
+        return redirect()->back()->with('success', 'WBS berhasil diperbarui!');
+    }
+
+    protected function updateWbsSuccessorDates($wbs)
+    {
+        $successors = ProjectWbs::where('predecessor_id', $wbs->id)->get();
+        foreach ($successors as $succ) {
+            if ($wbs->due_date) {
+                $newStart = \Carbon\Carbon::parse($wbs->due_date)->addDay();
+                $succ->start_date = $newStart;
+                if ($succ->duration) {
+                    $succ->due_date = $newStart->copy()->addDays($succ->duration - 1);
+                }
+                $succ->save();
+                
+                // Recurse down the chain
+                $this->updateWbsSuccessorDates($succ);
+            }
+        }
+    }
+
+    public function bulkSaveProjectWbs(Request $request, $wonId)
+    {
+        $wbsData = $request->input('wbs', []);
+
+        DB::beginTransaction();
+        try {
+            foreach ($wbsData as $id => $data) {
+                $wbs = ProjectWbs::findOrFail($id);
+
+                $duration = isset($data['duration']) && $data['duration'] !== '' ? (int)$data['duration'] : null;
+                $startDate = !empty($data['start_date']) ? \Carbon\Carbon::parse($data['start_date']) : null;
+                $dueDate = !empty($data['due_date']) ? \Carbon\Carbon::parse($data['due_date']) : null;
+                $predecessorId = !empty($data['predecessor_id']) ? $data['predecessor_id'] : null;
+
+                // Handle file upload
+                $linkFile = isset($data['link_file']) ? $data['link_file'] : $wbs->link_file;
+                if ($request->hasFile("wbs.{$id}.file_upload")) {
+                    $path = $request->file("wbs.{$id}.file_upload")->store('wbs_files', 'public');
+                    $linkFile = \Illuminate\Support\Facades\Storage::url($path);
+                }
+
+                // Predecessor date logic: start_date is predecessor's due_date + 1 day
+                if ($predecessorId) {
+                    $pred = ProjectWbs::find($predecessorId);
+                    if ($pred && $pred->due_date) {
+                        $startDate = \Carbon\Carbon::parse($pred->due_date)->addDay();
+                    }
+                }
+
+                // Calculate missing date/duration
+                if ($startDate) {
+                    if ($duration !== null && $duration > 0) {
+                        $dueDate = $startDate->copy()->addDays($duration - 1);
+                    } elseif ($dueDate) {
+                        $diff = $dueDate->timestamp - $startDate->timestamp;
+                        $duration = (int)round($diff / (60 * 60 * 24)) + 1;
+                        if ($duration < 0) $duration = 0;
+                    }
+                }
+
+                $status = $data['status'] ?? $wbs->status;
+                $finishDate = !empty($data['finish_date']) ? \Carbon\Carbon::parse($data['finish_date']) : null;
+                if ($finishDate) {
+                    $status = 'DONE';
+                }
+
+                $wbs->update([
+                    'task_to' => $data['task_to'] ?? $wbs->task_to,
+                    'jmt_pic_id' => !empty($data['jmt_pic_id']) ? $data['jmt_pic_id'] : null,
+                    'client_pic' => !empty($data['client_pic']) ? $data['client_pic'] : null,
+                    'predecessor_id' => $predecessorId,
+                    'start_date' => $startDate,
+                    'due_date' => $dueDate,
+                    'duration' => $duration,
+                    'status' => $status,
+                    'finish_date' => $finishDate,
+                    'keterangan' => !empty($data['keterangan']) ? $data['keterangan'] : null,
+                    'link_file' => $linkFile,
+                ]);
+            }
+
+            // Run date propagation loop in sorting order
+            $allWbs = ProjectWbs::where('won_id', $wonId)->orderBy('order_num', 'asc')->get();
+            foreach ($allWbs as $item) {
+                if ($item->predecessor_id) {
+                    $pred = ProjectWbs::find($item->predecessor_id);
+                    if ($pred && $pred->due_date) {
+                        $item->start_date = \Carbon\Carbon::parse($pred->due_date)->addDay();
+                        if ($item->duration) {
+                            $item->due_date = $item->start_date->copy()->addDays($item->duration - 1);
+                        }
+                        $item->save();
+                    }
+                }
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->withErrors(['error' => 'Gagal menyimpan perubahan WBS: ' . $e->getMessage()]);
+        }
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Bulk Update Project WBS',
+            'details' => "Memperbarui secara massal lembar kerja WBS untuk Won ID: {$wonId}",
+        ]);
+
+        return redirect()->route('project.activity', ['won_id' => $wonId])->with('success', 'Seluruh perubahan WBS berhasil disimpan!');
     }
 
     public function saveProjectActivity(Request $request)
@@ -1594,6 +1931,7 @@ class AntrianController extends Controller
             'tgl_masuk' => 'required|date',
             'tgl_deadline' => 'required|date|after_or_equal:tgl_masuk',
             'task' => 'required|string',
+            'jenis_request' => 'nullable|string|in:Pra-Golive,Golive',
             'picrequest_id' => 'required',
             'picdeveloper_id' => 'required',
         ]);
@@ -1618,6 +1956,7 @@ class AntrianController extends Controller
             'tgl_masuk' => $validated['tgl_masuk'],
             'tgl_deadline' => $request->tgl_deadline,
             'task' => $validated['task'],
+            'jenis_request' => $request->jenis_request ?? 'Golive',
             'picrequest_id' => $request->picrequest_id,
             'picdeveloper_id' => $request->picdeveloper_id,
             'updated_at' => now(),
@@ -1819,6 +2158,69 @@ class AntrianController extends Controller
                 'message' => 'Gagal mengekstrak audio: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function assignImplementator(Request $request, $wonId)
+    {
+        $request->validate([
+            'pic_implementator_id' => 'required|exists:pegawai_m,id',
+        ]);
+
+        $won = \App\Models\Won::findOrFail($wonId);
+        $won->update([
+            'pic_implementator_id' => $request->pic_implementator_id,
+        ]);
+
+        \App\Models\AuditLog::create([
+            'user_id' => Auth::id(),
+            'activity' => 'Assign Implementator to Project',
+            'details' => "Menugaskan PIC Implementator ke Proyek Won: " . $won->project_name,
+        ]);
+
+        return redirect()->back()->with('success', 'PIC Implementator berhasil ditugaskan untuk proyek ini!');
+    }
+
+    public function toggleWonDetailChecklist(Request $request)
+    {
+        $request->validate([
+            'checklist_id' => 'required|exists:won_detail_checklists,id',
+            'is_checked' => 'required|boolean',
+        ]);
+
+        $checklist = \App\Models\WonDetailChecklist::findOrFail($request->checklist_id);
+        
+        $isChecked = (bool)$request->is_checked;
+        $checklist->update([
+            'is_checked' => $isChecked,
+            'checked_at' => $isChecked ? now() : null,
+        ]);
+
+        // Recalculate parent WonDetail progress & status
+        $wonDetail = $checklist->wonDetail;
+        $totalChecklists = $wonDetail->checklists()->count();
+        $checkedChecklists = $wonDetail->checklists()->where('is_checked', true)->count();
+
+        $progress = $totalChecklists > 0 ? (int)round(($checkedChecklists / $totalChecklists) * 100) : 0;
+        
+        $status = 'To Do';
+        if ($progress === 100) {
+            $status = 'Done';
+        } elseif ($progress > 0) {
+            $status = 'On Progress';
+        }
+
+        $wonDetail->update([
+            'progress' => $progress,
+            'status' => $status,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'is_checked' => $checklist->is_checked,
+            'checked_at' => $checklist->checked_at ? $checklist->checked_at->format('d M Y H:i') : '-',
+            'progress' => $progress,
+            'status' => $status,
+        ]);
     }
 
 }
