@@ -26,4 +26,14 @@ class Project extends Model
     {
         return $this->hasMany(ActionItem::class, 'project_id');
     }
+
+    public function lead()
+    {
+        return $this->belongsTo(Lead::class, 'lead_id');
+    }
+
+    public function proposal()
+    {
+        return $this->belongsTo(Proposal::class, 'proposal_id');
+    }
 }

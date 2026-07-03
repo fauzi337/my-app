@@ -110,13 +110,29 @@
             <!-- LIST TIMELINE REQUESTS -->
             <div class="lg:col-span-2 space-y-6">
                 <div class="premium-card p-6">
-                    <div class="border-b pb-3 mb-4 flex items-center justify-between">
-                        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 m-0">
-                            <i class="bi bi-clock-history text-indigo-500"></i> Daftar Timeline Request
-                        </h3>
-                        <span class="text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg">
-                            Total: {{ count($daftarJadwal) }} Request
-                        </span>
+                    <div class="border-b pb-3 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 m-0">
+                                <i class="bi bi-clock-history text-indigo-500"></i> Daftar Timeline Request
+                            </h3>
+                            <span class="text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg">
+                                Total: {{ count($daftarJadwal) }} Request
+                            </span>
+                        </div>
+                        <div class="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
+                            <a href="{{ request()->fullUrlWithQuery(['jenis_request' => 'Golive']) }}" 
+                               class="px-3.5 py-1.5 rounded-lg no-underline transition-all flex items-center gap-1.5 {{ $selectedJenisRequest === 'Golive' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-550 hover:text-slate-800' }}">
+                                <i class="bi bi-rocket-takeoff-fill"></i> Golive
+                            </a>
+                            <a href="{{ request()->fullUrlWithQuery(['jenis_request' => 'Pra-Golive']) }}" 
+                               class="px-3.5 py-1.5 rounded-lg no-underline transition-all flex items-center gap-1.5 {{ $selectedJenisRequest === 'Pra-Golive' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-555 hover:text-slate-800' }}">
+                                <i class="bi bi-tools"></i> Pra-Golive
+                            </a>
+                            <a href="{{ request()->fullUrlWithQuery(['jenis_request' => 'all']) }}" 
+                               class="px-3.5 py-1.5 rounded-lg no-underline transition-all flex items-center gap-1.5 {{ $selectedJenisRequest === 'all' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-555 hover:text-slate-800' }}">
+                                <i class="bi bi-collection-fill"></i> Semua
+                            </a>
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -126,6 +142,7 @@
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-px whitespace-nowrap">Aksi</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-px whitespace-nowrap">KD-List / Prioritas</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-px whitespace-nowrap">Jenis Task / PIC Dev</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-px whitespace-nowrap">Tipe</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider min-w-[350px]">Task</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-px whitespace-nowrap">Timeline</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-px whitespace-nowrap">Tgl Masuk</th>
@@ -136,7 +153,7 @@
                                 @forelse ($daftarJadwal as $index => $item)
                                     <!-- Site Group Header Row -->
                                     <tr x-show="showSiteHeader({{ $index }}, '{{ addslashes($item->namasite) }}')" class="bg-indigo-50/30">
-                                        <td colspan="7" class="px-4 py-2.5 bg-indigo-50/80 border-y border-indigo-100/50 text-indigo-700 font-bold text-xs uppercase tracking-wider">
+                                        <td colspan="8" class="px-4 py-2.5 bg-indigo-50/80 border-y border-indigo-100/50 text-indigo-700 font-bold text-xs uppercase tracking-wider">
                                             <div class="flex items-center gap-1.5">
                                                 <i class="bi bi-geo-alt-fill text-indigo-500"></i> Site: {{ $item->namasite }}
                                             </div>
@@ -151,7 +168,7 @@
                                                         class="inline-flex items-center justify-center w-7 h-7 bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm border-0 transition-colors"
                                                         data-bs-toggle="modal" 
                                                         data-bs-target="#editJadwalModal"
-                                                        onclick="setEditJadwalData('{{ $item->id }}', '{{ $item->prioritas_id }}', '{{ $item->jenistask_id }}', '{{ $item->site_id }}', '{{ $item->timeline_id }}', '{{ $item->tgl_masuk }}', '{{ $item->tgl_deadline }}', '{{ addslashes($item->task) }}', '{{ $item->picrequest_id }}', '{{ $item->picdeveloper_id }}')"
+                                                        onclick="setEditJadwalData('{{ $item->id }}', '{{ $item->prioritas_id }}', '{{ $item->jenistask_id }}', '{{ $item->site_id }}', '{{ $item->timeline_id }}', '{{ $item->tgl_masuk }}', '{{ $item->tgl_deadline }}', '{{ addslashes($item->task) }}', '{{ $item->picrequest_id }}', '{{ $item->picdeveloper_id }}', '{{ $item->jenis_request }}')"
                                                         title="Edit Request">
                                                         <i class="bi bi-pencil-square"></i>
                                                     </button>
@@ -189,6 +206,17 @@
                                                 <i class="bi bi-person-gear text-indigo-400"></i> {{ $item->pic_developer ?? 'Belum ada' }}
                                             </div>
                                         </td>
+                                        <td class="px-4 py-3 w-px whitespace-nowrap">
+                                            @if($item->jenis_request === 'Pra-Golive')
+                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold border bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-850 flex items-center gap-1 w-fit">
+                                                    <i class="bi bi-tools"></i> PRA-GOLIVE
+                                                </span>
+                                            @else
+                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-850 flex items-center gap-1 w-fit">
+                                                    <i class="bi bi-rocket-takeoff-fill"></i> GOLIVE
+                                                </span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3">
                                             <div class="font-semibold text-slate-800 leading-relaxed min-w-[350px] break-words">{{ $item->task }}</div>
                                         </td>
@@ -202,7 +230,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center py-12 text-slate-400">
+                                        <td colspan="8" class="text-center py-12 text-slate-400">
                                             <i class="bi bi-inbox text-3xl block mb-2 text-slate-300"></i>
                                             Belum ada timeline request yang terdaftar.
                                         </td>
@@ -299,6 +327,20 @@
                             <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Task Deadline</label>
                             <input type="date" name="task_deadline" id="taskDeadline" required class="form-control text-sm mt-1 border-slate-300 rounded-lg" 
                                 value="{{ old('task_deadline', isset($selectedTimeline) ? \Carbon\Carbon::parse($selectedTimeline->tgl_deadline)->format('Y-m-d') : '') }}">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Tipe Request</label>
+                        <div class="flex items-center gap-4 text-xs font-bold text-slate-700">
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="jenis_request" value="Pra-Golive" class="accent-indigo-650 w-4 h-4">
+                                <span>Pra-Golive</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="jenis_request" value="Golive" checked class="accent-indigo-650 w-4 h-4">
+                                <span>Golive (Default)</span>
+                            </label>
                         </div>
                     </div>
 
@@ -430,6 +472,20 @@
                             </div>
 
                             <div>
+                                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Tipe Request</label>
+                                <div class="flex items-center gap-4 text-xs font-bold text-slate-700">
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                        <input type="radio" name="jenis_request" id="editJenisRequestPra" value="Pra-Golive" class="accent-indigo-650 w-4 h-4">
+                                        <span>Pra-Golive</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                        <input type="radio" name="jenis_request" id="editJenisRequestGo" value="Golive" class="accent-indigo-650 w-4 h-4">
+                                        <span>Golive</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div>
                                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Task</label>
                                 <textarea name="task" id="editTask" required class="form-control text-sm mt-1 border-slate-300 rounded-lg" rows="3.5" placeholder="Tulis detail request..."></textarea>
                             </div>
@@ -484,7 +540,7 @@
         }
     });
 
-    function setEditJadwalData(id, prioritasId, jenistaskId, siteId, timelineId, tglMasuk, tglDeadline, task, picrequestId, picdeveloperId) {
+    function setEditJadwalData(id, prioritasId, jenistaskId, siteId, timelineId, tglMasuk, tglDeadline, task, picrequestId, picdeveloperId, jenisRequest) {
         const form = document.getElementById('editJadwalForm');
         form.action = `/update-jadwal/${id}`;
 
@@ -500,6 +556,12 @@
         document.getElementById('editTask').value = task;
         document.getElementById('editPicRequestId').value = picrequestId;
         document.getElementById('editPicDeveloperId').value = picdeveloperId;
+
+        if (jenisRequest === 'Pra-Golive') {
+            document.getElementById('editJenisRequestPra').checked = true;
+        } else {
+            document.getElementById('editJenisRequestGo').checked = true;
+        }
     }
     </script>
     </html>
