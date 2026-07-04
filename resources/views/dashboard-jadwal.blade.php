@@ -222,10 +222,10 @@
                                         </td>
                                         <td class="px-4 py-3 w-px whitespace-nowrap text-slate-600 font-medium">{{ $item->gabung }}</td>
                                         <td class="px-4 py-3 w-px whitespace-nowrap text-slate-600 font-medium">
-                                            {{ $item->tgl_masuk ? \Carbon\Carbon::parse($item->tgl_masuk)->format('d M Y') : '-' }}
+                                            {{ $item->tgl_masuk ? \Carbon\Carbon::parse($item->tgl_masuk)->format('d M Y H:i') : '-' }}
                                         </td>
                                         <td class="px-4 py-3 w-px whitespace-nowrap text-slate-600 font-semibold">
-                                            {{ $item->tgl_deadline ? \Carbon\Carbon::parse($item->tgl_deadline)->format('d M Y') : '-' }}
+                                            {{ $item->tgl_deadline ? \Carbon\Carbon::parse($item->tgl_deadline)->format('d M Y H:i') : '-' }}
                                         </td>
                                     </tr>
                                 @empty
@@ -284,7 +284,7 @@
 
                     <div>
                         <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Prioritas</label>
-                        <select name="prioritas" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <select name="prioritas" id="prioritasSelect" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                             @foreach ($prioritas as $itemprioritas)
                                 <option value="{{ $itemprioritas->id }}">{{ $itemprioritas->namaprioritas }}</option>
                             @endforeach
@@ -293,7 +293,7 @@
 
                     <div>
                         <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Jenis Task</label>
-                        <select name="jenistask" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <select name="jenistask" id="jenisTaskSelect" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                             @foreach ($jenisTask as $itemJenisTask)
                                 <option value="{{ $itemJenisTask->id }}">{{ $itemJenisTask->jenistask }}</option>
                             @endforeach
@@ -302,7 +302,7 @@
 
                     <div>
                         <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Site</label>
-                        <select name="site" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <select name="site" id="siteSelect" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                             @foreach ($site as $itemSite)
                                 <option value="{{ $itemSite->id }}">{{ $itemSite->namasite }}</option>
                             @endforeach
@@ -321,12 +321,12 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Task Masuk</label>
-                            <input type="date" name="task_masuk" required class="form-control text-sm mt-1 border-slate-300 rounded-lg" value="{{ old('task_masuk', date('Y-m-d')) }}">
+                            <input type="datetime-local" name="task_masuk" required class="form-control text-sm mt-1 border-slate-300 rounded-lg" value="{{ old('task_masuk', date('Y-m-d\TH:i')) }}">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Task Deadline</label>
-                            <input type="date" name="task_deadline" id="taskDeadline" required class="form-control text-sm mt-1 border-slate-300 rounded-lg" 
-                                value="{{ old('task_deadline', isset($selectedTimeline) ? \Carbon\Carbon::parse($selectedTimeline->tgl_deadline)->format('Y-m-d') : '') }}">
+                            <input type="datetime-local" name="task_deadline" id="taskDeadline" class="form-control text-sm mt-1 border-slate-300 rounded-lg" 
+                                value="{{ old('task_deadline', isset($selectedTimeline) ? \Carbon\Carbon::parse($selectedTimeline->tgl_deadline)->format('Y-m-d\TH:i') : '') }}">
                         </div>
                     </div>
 
@@ -351,7 +351,7 @@
 
                     <div>
                         <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">PIC Request</label>
-                        <select name="picrequest" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <select name="picrequest" id="picRequestSelect" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                             @foreach ($picReq as $itemPicReq)
                                 <option value="{{ $itemPicReq->id }}">{{ $itemPicReq->namalengkap }}</option>
                             @endforeach
@@ -360,7 +360,7 @@
 
                     <div>
                         <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">PIC Developer</label>
-                        <select name="pegawai" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <select name="pegawai" id="picDeveloperSelect" required class="form-select text-sm mt-1 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                             @foreach ($pegawai as $pagawe)
                                 <option value="{{ $pagawe->id }}">{{ $pagawe->kdjenispegawai }} - {{ $pagawe->namapegawai }}</option>
                             @endforeach
@@ -463,11 +463,11 @@
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Task Masuk</label>
-                                    <input type="date" name="tgl_masuk" id="editTglMasuk" required class="form-control text-sm mt-1 border-slate-300 rounded-lg">
+                                    <input type="datetime-local" name="tgl_masuk" id="editTglMasuk" required class="form-control text-sm mt-1 border-slate-300 rounded-lg">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Task Deadline</label>
-                                    <input type="date" name="tgl_deadline" id="editTglDeadline" required class="form-control text-sm mt-1 border-slate-300 rounded-lg">
+                                    <input type="datetime-local" name="tgl_deadline" id="editTglDeadline" class="form-control text-sm mt-1 border-slate-300 rounded-lg">
                                 </div>
                             </div>
 
@@ -531,6 +531,71 @@
         }
     });
 
+    // Mapping prioritas otomatis by master SLA
+    const masterSlas = @json($masterSlas);
+    document.getElementById('jenisTaskSelect').addEventListener('change', function () {
+        const selectedJenisTaskId = parseInt(this.value);
+        const filteredSlas = masterSlas.filter(function (item) {
+            return item.jenistask_id === selectedJenisTaskId && item.prioritas_id !== null;
+        });
+
+        if (filteredSlas.length > 0) {
+            const targetPrioritasId = filteredSlas[0].prioritas_id;
+            document.getElementById('prioritasSelect').value = targetPrioritasId;
+        }
+    });
+
+    // Filter PIC berdasarkan Site terpilih
+    const allPicReqs = @json($picReq);
+    const allDevs = @json($pegawai);
+
+    function filterPicBySite(siteId, targetSelectId, allPicData, isDeveloper = false) {
+        const selectEl = document.getElementById(targetSelectId);
+        if (!selectEl) return;
+        const currentValue = selectEl.value;
+        selectEl.innerHTML = '';
+
+        const filtered = allPicData.filter(function (item) {
+            return !siteId || item.site_id === parseInt(siteId) || !item.site_id;
+        });
+
+        filtered.forEach(function (item) {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            if (isDeveloper) {
+                opt.textContent = `${item.kdjenispegawai} - ${item.namapegawai}`;
+            } else {
+                opt.textContent = item.namalengkap || item.namapegawai;
+            }
+            selectEl.appendChild(opt);
+        });
+
+        if (currentValue && filtered.some(i => i.id == currentValue)) {
+            selectEl.value = currentValue;
+        }
+    }
+
+    // Event listener untuk Form Tambah Request Baru
+    document.getElementById('siteSelect').addEventListener('change', function () {
+        const siteId = this.value;
+        filterPicBySite(siteId, 'picRequestSelect', allPicReqs, false);
+        filterPicBySite(siteId, 'picDeveloperSelect', allDevs, true);
+    });
+
+    // Picu filter awal saat halaman dimuat
+    const initialSiteId = document.getElementById('siteSelect').value;
+    if (initialSiteId) {
+        filterPicBySite(initialSiteId, 'picRequestSelect', allPicReqs, false);
+        filterPicBySite(initialSiteId, 'picDeveloperSelect', allDevs, true);
+    }
+
+    // Event listener untuk Modal Edit Request
+    document.getElementById('editSiteId').addEventListener('change', function () {
+        const siteId = this.value;
+        filterPicBySite(siteId, 'editPicRequestId', allPicReqs, false);
+        filterPicBySite(siteId, 'editPicDeveloperId', allDevs, true);
+    });
+
     document.getElementById('editTimelineId').addEventListener('change', function () { 
         const selectedOption = this.options[this.selectedIndex];
         const deadline = selectedOption.getAttribute('data-deadline');
@@ -548,10 +613,17 @@
         document.getElementById('editJenistaskId').value = jenistaskId;
         document.getElementById('editSiteId').value = siteId;
         document.getElementById('editTimelineId').value = timelineId;
+
+        // Picu filter PIC di modal edit berdasarkan siteId yang terpilih
+        filterPicBySite(siteId, 'editPicRequestId', allPicReqs, false);
+        filterPicBySite(siteId, 'editPicDeveloperId', allDevs, true);
         
-        // Parse date strings to YYYY-MM-DD for input[type="date"]
-        document.getElementById('editTglMasuk').value = tglMasuk ? tglMasuk.split(' ')[0] : '';
-        document.getElementById('editTglDeadline').value = tglDeadline ? tglDeadline.split(' ')[0] : '';
+        function formatDatetimeLocal(val) {
+            if (!val) return '';
+            return val.replace(' ', 'T').substring(0, 16);
+        }
+        document.getElementById('editTglMasuk').value = formatDatetimeLocal(tglMasuk);
+        document.getElementById('editTglDeadline').value = formatDatetimeLocal(tglDeadline);
         
         document.getElementById('editTask').value = task;
         document.getElementById('editPicRequestId').value = picrequestId;

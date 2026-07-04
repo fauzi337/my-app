@@ -152,7 +152,9 @@ class AntrianController extends Controller
                             ->select('pg.id','pg.namalengkap')
                             ->get();
 
-        return view('dashboard-jadwal', compact('daftarJadwal','pegawai','prioritas','jenisTask','site','timeline','picReq','statusDev','statusServer','statusPicReq','statusFinal','cekLogin', 'selectedJenisRequest'));
+        $masterSlas = \App\Models\MasterSla::all();
+
+        return view('dashboard-jadwal', compact('daftarJadwal','pegawai','prioritas','jenisTask','site','timeline','picReq','statusDev','statusServer','statusPicReq','statusFinal','cekLogin', 'selectedJenisRequest', 'masterSlas'));
       
     }
 
@@ -176,31 +178,56 @@ class AntrianController extends Controller
 
         $validated = $request->validate([
             'task_masuk' => 'required|date',
-            'task_deadline' => 'required|date|after_or_equal:task_masuk',
+            'task_deadline' => 'nullable|date|after_or_equal:task_masuk',
             'task' => 'required|string',
             'jenis_request' => 'nullable|string|in:Pra-Golive,Golive'
         ],[
             'task_masuk.required' => 'Silahkan isi Task Masuk terlebih dahulu !',
             'task.required' => 'Silahkan isi Task terlebih dahulu !',
-            'task_deadline.required' => 'Task Deadline tidak boleh lebih besar dari Task Masuk !'
         ]);
 
         $kdSite = Site::where('statusenabled', true)
                         ->where('id', $request->site)
                         ->value('kdsite');
-                        // ->get();
         $count = Jadwal::where('kd_list', $kdSite)->count() + 1;
-        // $kode = $kdSite + $count;
+
+        // Hitung SLA otomatis jika ada master SLA (Kombinasi Spesifik)
+        $sla = \App\Models\MasterSla::where('prioritas_id', $request->prioritas)
+            ->where('jenistask_id', $request->jenistask)
+            ->first();
+
+        // Fallback 1: Jika tidak ada kombinasi spesifik, cari berdasarkan Jenis Task (Semua Prioritas)
+        if (!$sla) {
+            $sla = \App\Models\MasterSla::whereNull('prioritas_id')
+                ->where('jenistask_id', $request->jenistask)
+                ->first();
+        }
+
+        // Fallback 2: Jika tidak ada juga, cari berdasarkan Prioritas (Semua Jenis Task)
+        if (!$sla) {
+            $sla = \App\Models\MasterSla::where('prioritas_id', $request->prioritas)
+                ->whereNull('jenistask_id')
+                ->first();
+        }
+
+        $slaHours = $sla ? $sla->sla_hours : null;
+
+        $tglMasuk = \Carbon\Carbon::parse($validated['task_masuk']);
+        if (empty($request->task_deadline) && $slaHours) {
+            $tglDeadline = $tglMasuk->copy()->addHours($slaHours);
+        } else {
+            $tglDeadline = $request->task_deadline ? \Carbon\Carbon::parse($request->task_deadline) : $tglMasuk;
+        }
 
         $data = Jadwal::insert([
-            'id' => $newid +1,
+            'id' => $newid + 1,
             'prioritas_id' => $request->prioritas,
             'jenistask_id' => $request->jenistask,
             'site_id' => $request->site,
             'timeline_id' => $request->timeline,
-            // 'tgl_masuk' => $request->task_masuk,
+            'sla_hours' => $slaHours,
             'tgl_masuk' => $validated['task_masuk'],
-            'tgl_deadline' => $request->task_deadline,
+            'tgl_deadline' => $tglDeadline,
             'task' => $validated['task'],
             'jenis_request' => $request->jenis_request ?? 'Golive',
             'picrequest_id' => $request->picrequest,
@@ -211,24 +238,31 @@ class AntrianController extends Controller
             'picrequest_status_id' => $request->picreqst,
             'final_status_id' => $request->finalst,
             'statusenabled' => true,
-            // 'kd_list' => $kdSite . '-' . $newid+1 ,
             'kd_list' => trim($kdSite),
             'nourut' => $count,
-            // 'kd_revisi' => $request->finalst = 20 ? $rev : null
             'created_at' => $today,
             'updated_at' => null
         ]);
 
         $postActivity = Activity::insert([
-            'id' => $newids +1,
+            'id' => $newids + 1,
             'statusenabled' => true,
             'aktifitas' => $validated['task'],
             'status' => 'Not Yet',
             'kd_list' => trim($kdSite) . '-' . $count,
             'created_at' => $today,
-            'jadwal_id' => $newid +1,
+            'jadwal_id' => $newid + 1,
         ]);
         
+        // Catat ke log_sla_t
+        \App\Models\LogSla::create([
+            'jadwal_id' => $newid + 1,
+            'tipe_aktifitas' => 'Created',
+            'status_sebelumnya' => null,
+            'status_sesudahnya' => 'Not Yet',
+            'aktifitas' => 'Task Baru "' . $validated['task'] . '" berhasil dibuat.',
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
+        ]);
 
         return redirect()->route('dashboard.jadwal')->with('success', 'Simpan Berhasil !');
     }
@@ -287,9 +321,11 @@ class AntrianController extends Controller
         // return $this->setStatusCode($result['status'])->respond($result, $transMessage);
     }
 
-    public function dashboardPicReq()
+    public function dashboardPicReq(Request $request)
     {
-        $listPicReq = Jadwal::from('jadwal_t as jt')
+        $selectedSiteId = $request->input('filter_site_id');
+
+        $query = Jadwal::from('jadwal_t as jt')
                             ->join('prioritas_m as pr','pr.id','=','jt.prioritas_id')
                             ->join('jenistask_m as js','js.id','=','jt.jenistask_id')
                             ->join('timeline_m as tm','tm.id','=','jt.timeline_id')
@@ -302,14 +338,18 @@ class AntrianController extends Controller
                             ->join('status_m as st4','st4.id','=','jt.final_status_id')
                             ->whereIn('st.id',[3,5])
                             ->whereNotIn('st4.id',[21])
-                            ->where('jt.statusenabled',true)
-                            ->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','jt.id',
+                            ->where('jt.statusenabled',true);
+
+        if ($selectedSiteId) {
+            $query->where('jt.site_id', $selectedSiteId);
+        }
+
+        $listPicReq = $query->select('pr.namaprioritas','js.jenistask','si.namasite','tm.gabung','jt.tgl_masuk','jt.task','jt.tgl_deadline','pg.namapegawai','jt.id',
                             DB::raw("CONCAT(pg2.kdjenispegawai, ' - ', pg2.namapegawai) as dev,CONCAT(jt.kd_list, '-', jt.nourut) as kd_list"),
                                     'st.status as devstatus','st2.status as servstatus','st3.status as picreqst','st3.id as picreqstid','st4.id as finalstid','st4.status as finalst','jt.path',
                                     'st.id as devstid')
                             ->orderBy('jt.created_at','desc')
                             ->get();
-                            // dd($listPicReq);
 
         $statusPicReq = Status::where('statusenabled', true)
                             ->where('jenisstatus','=','Pic Request')
@@ -319,24 +359,63 @@ class AntrianController extends Controller
                             ->where('jenisstatus','=','Final')
                             ->whereNotIn('status',['Pending','Selesai'])
                             ->get(); 
+        $sites = Site::where('statusenabled', true)->get();
 
-        return view('dashboard-picrequest', compact('listPicReq','statusPicReq','statusFinal'));
+        return view('dashboard-picrequest', compact('listPicReq','statusPicReq','statusFinal', 'sites', 'selectedSiteId'));
     }
 
-   public function updateStatus(Request $request, $id)
+    public function updateStatus(Request $request, $id)
     {
         $today = carbon::now();
-        $id = intval($request->id); // Ubah ke integer
+        $id = intval($request->id);
         $newids = Activity::max('id');
 
         $updateJadwal = Jadwal::find($id);
+        
+        // Ambil status sebelum update
+        $statusSebelumnyaDev = DB::table('status_m')->where('id', $updateJadwal->developer_status_id)->value('status') ?? 'Not Yet';
+        $statusSebelumnyaServer = DB::table('status_m')->where('id', $updateJadwal->server_status_id)->value('status') ?? 'Not Yet';
+
         $updateJadwal->developer_status_id = $request->devstid;
         $updateJadwal->server_status_id = $request->servstid;
         $updateJadwal->picrequest_status_id = $request->devstid == 5 ? 13 : 11;
-        $updateJadwal->tgl_selesai = $request->devstid == 3 ? $request->tgl_selesai : null;
+        
+        $performaScore = null;
+        if ($request->devstid == 3) {
+            $tglSelesaiVal = $request->tgl_selesai ? \Carbon\Carbon::parse($request->tgl_selesai) : \Carbon\Carbon::now();
+            $updateJadwal->tgl_selesai = $tglSelesaiVal;
+            
+            // Hitung performa
+            $tglDeadline = \Carbon\Carbon::parse($updateJadwal->tgl_deadline);
+            if ($tglSelesaiVal->lte($tglDeadline)) {
+                $performaScore = 100;
+            } else {
+                // Hitung selisih menit, bagi dengan 1440 (menit dalam sehari) lalu bulatkan ke atas
+                $diffInMinutes = $tglSelesaiVal->diffInMinutes($tglDeadline);
+                $diffInDays = ceil($diffInMinutes / 1440);
+                $performaScore = max(0, 100 - ($diffInDays * 10)); // Potong 10 poin per hari (termasuk terlambat beberapa jam)
+            }
+        } else {
+            $updateJadwal->tgl_selesai = null;
+        }
+
+        $updateJadwal->performa_score = $performaScore;
         $updateJadwal->final_status_id = $request->devstid == 5 ? 18 : 17;
         $updateJadwal->updated_at = $today;
         $updateJadwal->save();
+
+        $statusSesudahnyaDev = DB::table('status_m')->where('id', $request->devstid)->value('status');
+        $statusSesudahnyaServer = DB::table('status_m')->where('id', $request->servstid)->value('status');
+
+        // Catat ke log_sla_t
+        \App\Models\LogSla::create([
+            'jadwal_id' => $id,
+            'tipe_aktifitas' => 'Developer Update',
+            'status_sebelumnya' => $statusSebelumnyaDev . ' (Server: ' . $statusSebelumnyaServer . ')',
+            'status_sesudahnya' => $statusSesudahnyaDev . ' (Server: ' . $statusSesudahnyaServer . ')',
+            'aktifitas' => 'Developer memperbarui status task menjadi "' . $statusSesudahnyaDev . '" di Server "' . $statusSesudahnyaServer . '".' . ($performaScore ? ' Skor Performa: ' . $performaScore : ''),
+            'user_id' => Auth::id(),
+        ]);
 
         $getDataDev = Jadwal::from('jadwal_t as jt')
                             ->join('status_m as st', 'st.id', '=', 'jt.developer_status_id')
@@ -377,40 +456,69 @@ class AntrianController extends Controller
         $id = intval($request->id); // Pastikan ID berupa angka
 
         $updatePicReqSt = Jadwal::find($id);
+
+        // Ambil status sebelum update
+        $statusSebelumnyaPic = DB::table('status_m')->where('id', $updatePicReqSt->picrequest_status_id)->value('status') ?? 'Not Yet';
+        $statusSebelumnyaFinal = DB::table('status_m')->where('id', $updatePicReqSt->final_status_id)->value('status') ?? 'Not Yet';
+
         $updatePicReqSt->picrequest_status_id = $request->picreqstid;
-        if ($request->picreqstid == 14) {
-            $updatePicReqSt->developer_status_id = 2;
+        
+        if ($request->picreqstid == 14) { // Bugs
+            $updatePicReqSt->developer_status_id = 2; // Kembali ke Progress
+            $updatePicReqSt->tgl_selesai = null; // Reset tgl_selesai
+            
+            // Tambahkan Grace Period 24 Jam ke deadline pengerjaan untuk memperbaiki bug
+            $currentDeadline = $updatePicReqSt->tgl_deadline ? \Carbon\Carbon::parse($updatePicReqSt->tgl_deadline) : \Carbon\Carbon::now();
+            $updatePicReqSt->tgl_deadline = $currentDeadline->addHours(24);
         }
+
+        if ($request->picreqstid == 15 && $request->finalstid == 20) { // Done & Revisi
+            $updatePicReqSt->developer_status_id = 4; // Set ke Done - Rev (ID 4)
+        }
+
         $updatePicReqSt->final_status_id = $request->finalstid;
         $updatePicReqSt->updated_at = $today;
         $updatePicReqSt->save();
 
+        $statusSesudahnyaPic = DB::table('status_m')->where('id', $request->picreqstid)->value('status');
+        $statusSesudahnyaFinal = DB::table('status_m')->where('id', $request->finalstid)->value('status');
+
+        // Catat ke log_sla_t
+        \App\Models\LogSla::create([
+            'jadwal_id' => $id,
+            'tipe_aktifitas' => 'PIC Request Update',
+            'status_sebelumnya' => $statusSebelumnyaPic . ' (Final: ' . $statusSebelumnyaFinal . ')',
+            'status_sesudahnya' => $statusSesudahnyaPic . ' (Final: ' . $statusSesudahnyaFinal . ')',
+            'aktifitas' => 'PIC Request memperbarui status task menjadi "' . $statusSesudahnyaPic . '" dan Status Akhir "' . $statusSesudahnyaFinal . '".',
+            'user_id' => Auth::id(),
+        ]);
+
         $getDataDev = Jadwal::from('jadwal_t as jt')
-                            ->join('status_m as st', 'st.id', '=', 'jt.picrequest_status_id')
-                            ->join('status_m as st2', 'st2.id', '=', 'jt.final_status_id')
-                            ->select('jt.task', 'st.status as picreqst', 'st2.status as finalst',
-                             DB::raw("CONCAT(REPLACE(TRIM(jt.kd_list), ' ', ''), '-', jt.nourut) AS kd_list"))
-                            ->where('jt.id', $id)
-                            ->first(); // Ambil satu data saja
+                             ->join('status_m as st', 'st.id', '=', 'jt.picrequest_status_id')
+                             ->join('status_m as st2', 'st2.id', '=', 'jt.final_status_id')
+                             ->select('jt.task', 'st.status as picreqst', 'st2.status as finalst',
+                              DB::raw("CONCAT(REPLACE(TRIM(jt.kd_list), ' ', ''), '-', jt.nourut) AS kd_list"))
+                             ->where('jt.id', $id)
+                             ->first(); // Ambil satu data saja
 
                         // Pastikan $getDataDev tidak null
                         if ($getDataDev) {
                             $newId = Activity::max('id') ?? 0;
 
                             $statusText = $getDataDev->task . 
-                                        ' Dengan Status = ' . $getDataDev->picreqst . 
-                                        ' dan Status Akhir - ' . $getDataDev->finalst . 
-                                        ' pada tgl ' . $todayDate;
+                                         ' Dengan Status = ' . $getDataDev->picreqst . 
+                                         ' dan Status Akhir - ' . $getDataDev->finalst . 
+                                         ' pada tgl ' . $todayDate;
 
                             Activity::insert([
-                                'id' => $newId + 1,
-                                'statusenabled' => true,
-                                'aktifitas' => $statusText,
-                                'kd_list' => $getDataDev->kd_list,
-                                'status' => $request->picreqstid == 15 ? $getDataDev->finalst : $getDataDev->picreqst,
-                                'created_at' => $today,
-                                'jadwal_id' => $id,
-                            ]);
+                                    'id' => $newId + 1,
+                                    'statusenabled' => true,
+                                    'aktifitas' => $statusText,
+                                    'kd_list' => $getDataDev->kd_list,
+                                    'status' => $request->picreqstid == 15 ? $getDataDev->finalst : $getDataDev->picreqst,
+                                    'created_at' => $today,
+                                    'jadwal_id' => $id,
+                                ]);
                         }
 
         return redirect()->back()->with('success', 'Status berhasil diupdate.');
@@ -1929,7 +2037,7 @@ class AntrianController extends Controller
             'site_id' => 'required',
             'timeline_id' => 'required',
             'tgl_masuk' => 'required|date',
-            'tgl_deadline' => 'required|date|after_or_equal:tgl_masuk',
+            'tgl_deadline' => 'nullable|date|after_or_equal:tgl_masuk',
             'task' => 'required|string',
             'jenis_request' => 'nullable|string|in:Pra-Golive,Golive',
             'picrequest_id' => 'required',
@@ -1948,13 +2056,42 @@ class AntrianController extends Controller
             $jadwal->nourut = $count;
         }
 
+        // Hitung SLA otomatis jika ada master SLA (Kombinasi Spesifik)
+        $sla = \App\Models\MasterSla::where('prioritas_id', $request->prioritas_id)
+            ->where('jenistask_id', $request->jenistask_id)
+            ->first();
+
+        // Fallback 1: Jika tidak ada kombinasi spesifik, cari berdasarkan Jenis Task (Semua Prioritas)
+        if (!$sla) {
+            $sla = \App\Models\MasterSla::whereNull('prioritas_id')
+                ->where('jenistask_id', $request->jenistask_id)
+                ->first();
+        }
+
+        // Fallback 2: Jika tidak ada juga, cari berdasarkan Prioritas (Semua Jenis Task)
+        if (!$sla) {
+            $sla = \App\Models\MasterSla::where('prioritas_id', $request->prioritas_id)
+                ->whereNull('jenistask_id')
+                ->first();
+        }
+
+        $slaHours = $sla ? $sla->sla_hours : null;
+
+        $tglMasuk = \Carbon\Carbon::parse($validated['tgl_masuk']);
+        if (empty($request->tgl_deadline) && $slaHours) {
+            $tglDeadline = $tglMasuk->copy()->addHours($slaHours);
+        } else {
+            $tglDeadline = $request->tgl_deadline ? \Carbon\Carbon::parse($request->tgl_deadline) : $tglMasuk;
+        }
+
         $jadwal->update([
             'prioritas_id' => $request->prioritas_id,
             'jenistask_id' => $request->jenistask_id,
             'site_id' => $request->site_id,
             'timeline_id' => $request->timeline_id,
+            'sla_hours' => $slaHours,
             'tgl_masuk' => $validated['tgl_masuk'],
-            'tgl_deadline' => $request->tgl_deadline,
+            'tgl_deadline' => $tglDeadline,
             'task' => $validated['task'],
             'jenis_request' => $request->jenis_request ?? 'Golive',
             'picrequest_id' => $request->picrequest_id,
@@ -1965,6 +2102,16 @@ class AntrianController extends Controller
         // Also update legacy activities if they exist
         Activity::where('jadwal_id', $id)->update([
             'aktifitas' => $validated['task'],
+        ]);
+
+        // Catat ke log_sla_t
+        \App\Models\LogSla::create([
+            'jadwal_id' => $id,
+            'tipe_aktifitas' => 'Detail Edit',
+            'status_sebelumnya' => null,
+            'status_sesudahnya' => null,
+            'aktifitas' => 'Detail/Rincian task berhasil diperbarui.',
+            'user_id' => Auth::id(),
         ]);
 
         return redirect()->back()->with('success', 'Timeline Request berhasil diperbarui!');
