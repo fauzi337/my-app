@@ -27,12 +27,17 @@
                             @if(in_array(auth()->user()->role, ['admin', 'manager']))
                             { label: 'Master WBS', href: '{{ route('wbs.master') }}' },
                             { label: 'Master Modul', href: '{{ route('modul.master') }}' },
+                            { label: 'Master SLA', href: '{{ route('sla.index') }}' },
+                            { label: 'SDM Kinerja', href: '{{ route('sdm.index') }}' },
+                            { label: 'Payroll & Gaji', href: '{{ route('payroll.index') }}' },
+                            { label: 'Data Pegawai', href: '{{ route('pegawai.index') }}' },
                             @endif
                             { label: 'Developer Dashboard', href: '{{ route('dashboard.dev') }}' },
                             { label: 'PIC Request Dashboard', href: '{{ route('dashboard.picreq') }}' },
                             { label: 'Request Server', href: '{{ route('dashboard.reqserver') }}' },
                             { label: 'Daily Report', href: '{{ route('dashboard.daily') }}' },
-                            { label: 'Weekly Report', href: '{{ route('dashboard.weekly') }}' }
+                            { label: 'Weekly Report', href: '{{ route('dashboard.weekly') }}' },
+                            { label: 'Log Aktivitas', href: '{{ route('activity.log') }}' }
                             @endif
                         ]
                     }"

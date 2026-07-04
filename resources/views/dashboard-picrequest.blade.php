@@ -150,10 +150,6 @@
                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-550 border border-slate-250 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-lg shadow-sm no-underline bg-white transition-all">
                     <i class="bi bi-journal-text"></i> Daily Report
                 </a>
-                <a href="{{ route('dashboard.weekly') }}"
-                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-550 border border-slate-250 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-lg shadow-sm no-underline bg-white transition-all">
-                    <i class="bi bi-calendar-range"></i> Weekly Report
-                </a>
 
                 <!-- Dropdown Filter Status -->
                 <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-sm">
@@ -166,6 +162,17 @@
                         <option value="done">Done</option>
                     </select>
                 </div>
+
+                <!-- Dropdown Filter Site -->
+                <form method="GET" action="{{ route('dashboard.picreq') }}" class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-sm mb-0">
+                    <i class="bi bi-geo-alt text-indigo-500 text-sm"></i>
+                    <select name="filter_site_id" onchange="this.form.submit()" class="text-xs font-semibold text-slate-700 border-0 bg-transparent p-0 pr-6 focus:ring-0 cursor-pointer">
+                        <option value="">Semua Site (All Site)</option>
+                        @foreach($sites as $s)
+                            <option value="{{ $s->id }}" {{ isset($selectedSiteId) && $selectedSiteId == $s->id ? 'selected' : '' }}>{{ $s->namasite }}</option>
+                        @endforeach
+                    </select>
+                </form>
             </div>
 
             <!-- Table Legend -->
@@ -447,6 +454,57 @@
     document.addEventListener('DOMContentLoaded', function () {
         const statusModal = document.getElementById('statusModal');
         const uploadModal = document.getElementById('uploadModal');
+        const statusSelect = document.getElementById('pic-request-status');
+        const finalStatusGroup = document.getElementById('final-status-group');
+
+        // Simpan opsi asli status PIC Request
+        let originalPicReqOptions = [];
+        if (statusSelect) {
+            originalPicReqOptions = Array.from(statusSelect.options).map(opt => ({
+                value: opt.value,
+                text: opt.text.trim()
+            }));
+        }
+
+        function toggleFinalStatus() {
+            if (statusSelect && statusSelect.value === '15') { // ID 15 = Done / Selesai
+                finalStatusGroup.style.display = 'block';
+            } else {
+                finalStatusGroup.style.display = 'none';
+            }
+        }
+
+        function rebuildPicReqStatusOptions(currentStatusId) {
+            if (!statusSelect) return;
+            statusSelect.innerHTML = '';
+
+            originalPicReqOptions.forEach(opt => {
+                const val = parseInt(opt.value);
+                const curr = parseInt(currentStatusId);
+
+                let show = false;
+                if (curr === 11) { // Current: Not Yet
+                    // Opsi: Not Yet (11), Testing (12)
+                    show = (val === 11 || val === 12);
+                } else if (curr === 12) { // Current: Testing
+                    // Opsi: Testing (12), Bugs (14), Done (15)
+                    show = (val === 12 || val === 14 || val === 15);
+                } else {
+                    // Status lainnya tampilkan semua opsi
+                    show = true;
+                }
+
+                if (show) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = opt.value;
+                    newOpt.text = opt.text;
+                    statusSelect.appendChild(newOpt);
+                }
+            });
+
+            statusSelect.value = currentStatusId;
+            toggleFinalStatus();
+        }
 
         statusModal.addEventListener('show.bs.modal', function (event) {
             const button = event.relatedTarget;
@@ -456,15 +514,11 @@
 
             statusModal.querySelector('input[name="id"]').value = id;
 
-            const picReqSelect = statusModal.querySelector('select[name="picreqstid"]');
+            // Rebuild opsi status PIC Request
+            rebuildPicReqStatusOptions(picreqst);
+
             const finalstSelect = statusModal.querySelector('select[name="finalstid"]');
-
-            if (picReqSelect) picReqSelect.value = picreqst;
             if (finalstSelect) finalstSelect.value = finalstatus;
-
-            if (picReqSelect) {
-                picReqSelect.dispatchEvent(new Event('change'));
-            }
 
             const form = document.getElementById('updateStatusForm');
             form.action = `/update-statuspicreq/${id}`;
@@ -479,17 +533,6 @@
             const form2 = document.getElementById('uploadFiless');
             form2.action = `/upload-pdf/${id}`;
         });
-
-        const statusSelect = document.getElementById('pic-request-status');
-        const finalStatusGroup = document.getElementById('final-status-group');
-
-        function toggleFinalStatus() {
-            if (statusSelect.value === '15') { // ID 15 = Selesai
-                finalStatusGroup.style.display = 'block';
-            } else {
-                finalStatusGroup.style.display = 'none';
-            }
-        }
 
         toggleFinalStatus();
         statusSelect.addEventListener('change', toggleFinalStatus);

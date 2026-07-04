@@ -366,7 +366,7 @@
                             <!-- tgl selesai -->
                             <div id="tgl-selesai-group" style="display: none;">
                                 <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Tanggal Selesai</label>
-                                <input type="date" name="tgl_selesai" class="form-control text-sm w-full border-slate-300 rounded-lg" value="{{ old('tgl_selesai', date('Y-m-d')) }}">
+                                <input type="datetime-local" name="tgl_selesai" class="form-control text-sm w-full border-slate-300 rounded-lg" value="{{ old('tgl_selesai', date('Y-m-d\TH:i')) }}">
                             </div>
                         </div>
 
@@ -391,6 +391,63 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         const statusModal = document.getElementById('statusModal');
+        const devSelect = document.getElementById('dev-status');
+        const tglSelesaiGroup = document.getElementById('tgl-selesai-group');
+        const serverStatus = document.getElementById('server-status');
+
+        // Simpan opsi asli status developer
+        let originalOptions = [];
+        if (devSelect) {
+            originalOptions = Array.from(devSelect.options).map(opt => ({
+                value: opt.value,
+                text: opt.text.trim()
+            }));
+        }
+
+        function toggleTanggalSelesai() {
+            if (devSelect && devSelect.value === '3') { // ID 3 = Selesai
+                tglSelesaiGroup.style.display = 'block';
+                serverStatus.style.display = 'block';
+            } else {
+                tglSelesaiGroup.style.display = 'none';
+                serverStatus.style.display = 'none';
+            }
+        }
+
+        function rebuildDevStatusOptions(currentStatusId) {
+            if (!devSelect) return;
+            devSelect.innerHTML = '';
+
+            originalOptions.forEach(opt => {
+                const val = parseInt(opt.value);
+                const curr = parseInt(currentStatusId);
+
+                let show = false;
+                if (curr === 1) { // Current: Not Yet
+                    // Opsi: Not Yet (1), Progress (2), Hold (5)
+                    show = (val === 1 || val === 2 || val === 5);
+                } else if (curr === 2) { // Current: Progress
+                    // Opsi: Progress (2), Done (3)
+                    show = (val === 2 || val === 3);
+                } else if (curr === 4) { // Current: Done - Rev
+                    // Opsi: Done - Rev (4), Progress (2), Hold (5)
+                    show = (val === 4 || val === 2 || val === 5);
+                } else {
+                    // Status lain (Done/Hold) tampilkan semua opsi
+                    show = true;
+                }
+
+                if (show) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = opt.value;
+                    newOpt.text = opt.text;
+                    devSelect.appendChild(newOpt);
+                }
+            });
+
+            devSelect.value = currentStatusId;
+            toggleTanggalSelesai();
+        }
 
         statusModal.addEventListener('show.bs.modal', function (event) {
             const button = event.relatedTarget;
@@ -401,37 +458,19 @@
 
             document.getElementById('dataId').value = id;
 
-            const devSelect = statusModal.querySelector('select[name="devstid"]');
+            // Rebuild opsi terlebih dahulu berdasarkan status saat ini
+            rebuildDevStatusOptions(devstatus);
+
             const servSelect = statusModal.querySelector('select[name="servstid"]');
-
-            if (devSelect) devSelect.value = devstatus;
             if (servSelect) servSelect.value = servstatus;
-
-            // Trigger change event to update conditional visibility
-            if (devSelect) {
-                devSelect.dispatchEvent(new Event('change'));
-            }
 
             const form = document.getElementById('updateStatusForm');
             form.action = `/update-statusdev/${id}`;
         });
 
-        const statusSelect = document.getElementById('dev-status');
-        const tglSelesaiGroup = document.getElementById('tgl-selesai-group');
-        const serverStatus = document.getElementById('server-status');
-
-        function toggleTanggalSelesai() {
-            if (statusSelect.value === '3') { // ID 3 = Selesai
-                tglSelesaiGroup.style.display = 'block';
-                serverStatus.style.display = 'block';
-            } else {
-                tglSelesaiGroup.style.display = 'none';
-                serverStatus.style.display = 'none';
-            }
+        if (devSelect) {
+            devSelect.addEventListener('change', toggleTanggalSelesai);
         }
-
-        toggleTanggalSelesai();
-        statusSelect.addEventListener('change', toggleTanggalSelesai);
     });
     </script>
     </html>

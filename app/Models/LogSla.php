@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class LogSla extends Model
+{
+    use HasFactory;
+
+    protected $table = 'log_sla_t';
+
+    protected $fillable = [
+        'jadwal_id',
+        'tipe_aktifitas',
+        'status_sebelumnya',
+        'status_sesudahnya',
+        'aktifitas',
+        'user_id',
+    ];
+
+    public function jadwal()
+    {
+        return $this->belongsTo(Jadwal::class, 'jadwal_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+}

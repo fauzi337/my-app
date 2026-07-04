@@ -65,6 +65,9 @@ Route::middleware('auth')->group(function () {
 
         // Follow-up Meeting Route
         Route::get('/create-followup-meeting/{parent_meeting_result_id}', [AntrianController::class, 'createFollowupMeeting'])->name('meeting.followup');
+
+        // Log Aktivitas Route
+        Route::get('/log-aktifitas', [App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity.log');
     });
 
     Route::middleware('role:admin,manager')->group(function () {
@@ -81,6 +84,28 @@ Route::middleware('auth')->group(function () {
         Route::post('/master-modul/detail/store/{modulId}', [App\Http\Controllers\MasterModulController::class, 'storeDetail'])->name('modul.master.detail.store');
         Route::post('/master-modul/detail/update/{id}', [App\Http\Controllers\MasterModulController::class, 'updateDetail'])->name('modul.master.detail.update');
         Route::get('/master-modul/detail/delete/{id}', [App\Http\Controllers\MasterModulController::class, 'deleteDetail'])->name('modul.master.detail.delete');
+
+        // Master SLA Routes
+        Route::get('/master-sla', [App\Http\Controllers\SlaController::class, 'index'])->name('sla.index');
+        Route::post('/master-sla', [App\Http\Controllers\SlaController::class, 'store'])->name('sla.store');
+        Route::put('/master-sla/{id}', [App\Http\Controllers\SlaController::class, 'update'])->name('sla.update');
+        Route::delete('/master-sla/{id}', [App\Http\Controllers\SlaController::class, 'destroy'])->name('sla.destroy');
+
+        // SDM Evaluasi Kinerja Routes
+        Route::get('/sdm-kinerja', [App\Http\Controllers\SdmKinerjaController::class, 'index'])->name('sdm.index');
+        Route::post('/sdm-kinerja/generate', [App\Http\Controllers\SdmKinerjaController::class, 'generate'])->name('sdm.generate');
+        Route::post('/sdm-kinerja/approve/{id}', [App\Http\Controllers\SdmKinerjaController::class, 'approve'])->name('sdm.approve');
+
+        // Payroll Routes
+        Route::get('/payroll', [App\Http\Controllers\PayrollController::class, 'index'])->name('payroll.index');
+        Route::post('/payroll/generate', [App\Http\Controllers\PayrollController::class, 'generate'])->name('payroll.generate');
+        Route::post('/payroll/pay/{id}', [App\Http\Controllers\PayrollController::class, 'pay'])->name('payroll.pay');
+
+        // Pegawai Routes
+        Route::get('/pegawai', [App\Http\Controllers\PegawaiController::class, 'index'])->name('pegawai.index');
+        Route::post('/pegawai', [App\Http\Controllers\PegawaiController::class, 'store'])->name('pegawai.store');
+        Route::put('/pegawai/{id}', [App\Http\Controllers\PegawaiController::class, 'update'])->name('pegawai.update');
+        Route::delete('/pegawai/{id}', [App\Http\Controllers\PegawaiController::class, 'destroy'])->name('pegawai.destroy');
     });
 
     // 3. Marketing Pipeline Routes (accessible by admin, manager, marketing)
